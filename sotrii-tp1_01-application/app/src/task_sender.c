@@ -44,7 +44,7 @@
 /* Application & Tasks includes */
 #include "board.h"
 #include "app.h"
-#include "task_i2c_interface.h"
+#include "adxl345.h"
 
 /********************** macros and definitions *******************************/
 #define G_TASK_SENDER_CNT_INI	0ul
@@ -74,9 +74,6 @@ void task_sender(void *parameters)
 	 * https://www.ti.com/product/PCF8574
  	 * dev_address = (address base | jumper less address)
  	 */
-	uint16_t dev_address = 0x27;
-	uint8_t dev_data = 0x55;
-
 	/* Print out: Task Initialized */
 	LOGGER_INFO(" ");
 	LOGGER_INFO("  %s is running - Tick [mS] = %lu", pcTaskGetName(NULL), xTaskGetTickCount());
@@ -87,9 +84,8 @@ void task_sender(void *parameters)
 		/* Update Task Counter */
 		g_task_sender_cnt++;
 
-		/* I2C Device Diver Write */
-		dev_data = ~dev_data;
-		write_i2c(&hi2c1, dev_address, dev_data);
+		/* ADXL345 wrapper builds the register-write frame and uses write_i2c(). */
+		adxl345_write_reg(&hi2c1, ADXL345_REG_POWER_CTL, ADXL345_MEASURE_MODE);
 
     	/* Print out: Wait 250mS */
 		LOGGER_INFO(p_task_sender_wait_250mS);

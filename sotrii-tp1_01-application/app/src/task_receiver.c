@@ -44,7 +44,7 @@
 /* Application & Tasks includes */
 #include "board.h"
 #include "app.h"
-#include "task_i2c_interface.h"
+#include "adxl345.h"
 
 /********************** macros and definitions *******************************/
 #define G_TASK_RECEIVER_CNT_INI	0ul
@@ -69,6 +69,8 @@ void task_receiver(void *parameters)
 	/*  Declare & Initialize Task Function variables */
 	g_task_receiver_cnt = G_TASK_RECEIVER_CNT_INI;
 
+	uint8_t dev_data = 0x00;
+
 	/* Print out: Task Initialized */
 	LOGGER_INFO(" ");
 	LOGGER_INFO("  %s is running - Tick [mS] = %lu", pcTaskGetName(NULL), xTaskGetTickCount());
@@ -78,6 +80,10 @@ void task_receiver(void *parameters)
     {
 		/* Update Task Counter */
 		g_task_receiver_cnt++;
+
+		/* ADXL345 wrapper requests the register read through read_i2c(). */
+		adxl345_read_reg(&hi2c1, ADXL345_REG_DEVID, &dev_data);
+		LOGGER_INFO("   ==> Task RECEIVER - ADXL345 DEVID: 0x%02X", dev_data);
 
     	/* Print out: Wait 250mS */
 		LOGGER_INFO(p_task_receiver_wait_250mS);
