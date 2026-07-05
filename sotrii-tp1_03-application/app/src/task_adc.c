@@ -60,6 +60,7 @@
 
 /********************** internal functions declaration ***********************/
 void task_adc_rx(void *parameters);
+static task_adc_status_t task_adc_hal_to_status(HAL_StatusTypeDef hal_status);
 
 /********************** internal data definition *****************************/
 const char *p_task_adc_rx_wait_250mS	= "   ==> Task ADC RX - Wait:   250mS";
@@ -75,8 +76,8 @@ uint32_t g_task_xxxx_rx_runtime_us;
 /* Task ADC RX thread */
 void task_adc_rx(void *parameters)
 {
-	/* Prevent unused argument(s) compilation warning */
-	UNUSED(parameters);
+	task_adc_dta_t *p_task_adc_rx_dta = (task_adc_dta_t *)parameters;
+	task_adc_rx_dta_t task_adc_rx_dta;
 
 	/*  Declare & Initialize Task Function variables */
 	g_task_xxxx_rx_cnt = G_TASK_XXXX_CNT_INI;
@@ -86,6 +87,16 @@ void task_adc_rx(void *parameters)
 	LOGGER_INFO(" ");
 	LOGGER_INFO("%s is running - Tick [mS] = %3d", pcTaskGetName(NULL), (int)xTaskGetTickCount());
 
+	/* ADC RX gatekeeper owns DMA starts. The DMA completion callback only
+	 * sends an event to queue_rx. */
+	p_task_adc_rx_dta->rx_status = task_adc_hal_to_status(HAL_ADC_Start_DMA(p_task_adc_rx_dta->device_id,
+																			(uint32_t *)p_task_adc_rx_dta->dma_buffer,
+																			TASK_ADC_CHANNEL_QTY));
+	if (TASK_ADC_STATUS_OK != p_task_adc_rx_dta->rx_status)
+	{
+		LOGGER_INFO("   ==> Task ADC RX - DMA start error status: %d", (int)p_task_adc_rx_dta->rx_status);
+	}
+
 	/* As per most tasks, this task is implemented in an infinite loop. */
 	for (;;)
 	{
@@ -94,13 +105,43 @@ void task_adc_rx(void *parameters)
 
 		cycle_counter_reset();
 
-		HAL_GPIO_TogglePin(LED_A_PORT, LED_A_PIN);
+		xQueueReceive(p_task_adc_rx_dta->queue_rx, &task_adc_rx_dta, portMAX_DELAY);
+		if (TASK_ADC_EVENT_CONVERSION_READY == task_adc_rx_dta.event)
+		{
+			/* The ISR already updated latest_buffer. The gatekeeper only
+			 * restarts the DMA acquisition cycle for the ADC peripheral. */
+			p_task_adc_rx_dta->rx_status = task_adc_hal_to_status(HAL_ADC_Start_DMA(p_task_adc_rx_dta->device_id,
+																					(uint32_t *)p_task_adc_rx_dta->dma_buffer,
+																					TASK_ADC_CHANNEL_QTY));
+			if (TASK_ADC_STATUS_OK != p_task_adc_rx_dta->rx_status)
+			{
+				LOGGER_INFO("   ==> Task ADC RX - DMA restart error status: %d", (int)p_task_adc_rx_dta->rx_status);
+			}
+		}
 
 		g_task_xxxx_rx_runtime_us = cycle_counter_get_time_us();
 
     	/* Print out: Wait 250mS */
-		LOGGER_INFO(p_task_adc_rx_wait_250mS);
-		vTaskDelay(TASK_XXXX_DEL_MAX);
+		// LOGGER_INFO(p_task_adc_rx_wait_250mS);
+	}
+}
+
+static task_adc_status_t task_adc_hal_to_status(HAL_StatusTypeDef hal_status)
+{
+	switch (hal_status)
+	{
+		case HAL_OK:
+			return TASK_ADC_STATUS_OK;
+
+		case HAL_BUSY:
+			return TASK_ADC_STATUS_BUSY;
+
+		case HAL_TIMEOUT:
+			return TASK_ADC_STATUS_TIMEOUT;
+
+		case HAL_ERROR:
+		default:
+			return TASK_ADC_STATUS_ERROR;
 	}
 }
 

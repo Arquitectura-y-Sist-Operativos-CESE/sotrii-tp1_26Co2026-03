@@ -41,11 +41,54 @@ extern "C" {
 #endif
 
 /********************** inclusions *******************************************/
+#include "cmsis_os.h"
 
 /********************** macros ***********************************************/
+#define TASK_ADC_CHANNEL_QTY			10u
+#define TASK_ADC_RX_QUEUE_LENGTH		1u
+#define TASK_ADC_RX_STACK_WORDS			(2u * configMINIMAL_STACK_SIZE)
 
 /********************** typedef **********************************************/
+typedef enum
+{
+	TASK_ADC_STATUS_OK = 0,
+	TASK_ADC_STATUS_ERROR,
+	TASK_ADC_STATUS_BUSY,
+	TASK_ADC_STATUS_TIMEOUT,
+	TASK_ADC_STATUS_EMPTY,
+	TASK_ADC_STATUS_FULL
+} task_adc_status_t;
+
+typedef enum
+{
+	TASK_ADC_EVENT_CONVERSION_READY = 0
+} task_adc_event_t;
+
+typedef struct
+{
+	task_adc_event_t	event;
+} task_adc_rx_dta_t;
+
 /* Structure of Task */
+typedef struct
+{
+	ADC_HandleTypeDef *	device_id;
+
+	TaskHandle_t		task_rx;
+	StaticTask_t		task_rx_tcb;
+	StackType_t			task_rx_stack[TASK_ADC_RX_STACK_WORDS];
+
+	QueueHandle_t		queue_rx;
+	StaticQueue_t		queue_rx_cb;
+	uint8_t				queue_rx_storage[TASK_ADC_RX_QUEUE_LENGTH * sizeof(task_adc_rx_dta_t)];
+
+	uint16_t			dma_buffer[TASK_ADC_CHANNEL_QTY];
+	uint16_t			latest_buffer[TASK_ADC_CHANNEL_QTY];
+	uint16_t			latest_size;
+	bool				latest_available;
+
+	task_adc_status_t	rx_status;
+} task_adc_dta_t;
 
 
 /* Structure of ADC Tx */

@@ -42,6 +42,7 @@
 
 /* Application & Tasks includes */
 #include "board.h"
+#include "task_adc_interface.h"
 
 /********************** macros and definitions *******************************/
 #define HAL_XXXX_CALLBACK_CNT_INI			0ul
@@ -105,6 +106,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 		hal_xxxx_callback_cnt++;
 
 		hal_xxxx_callback_runtime_us = cycle_counter_get_time_us();
+
+		adc_cplt_callback(hadc);
 	}
 }
 
