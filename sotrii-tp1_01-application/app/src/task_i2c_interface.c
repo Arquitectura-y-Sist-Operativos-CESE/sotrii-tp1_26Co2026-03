@@ -132,10 +132,20 @@ void write_i2c(I2C_HandleTypeDef *h_i2c_device, uint16_t dev_address, uint8_t de
 	}
 }
 
-void read_i2c(I2C_HandleTypeDef *h_i2c_device)
+void read_i2c(I2C_HandleTypeDef *h_i2c_device, uint8_t *p_data)
 {
-	/* Prevent unused argument(s) compilation warning */
-	UNUSED(h_i2c_device);
+	task_i2c_dta_t *p_task_i2c_dta = &task_i2c_dta;
+
+	// Validación de seguridad para asegurar que operamos sobre el periférico correcto
+	if (p_task_i2c_dta->device_id == h_i2c_device)
+	{
+		/* PATRÓN SINCRÓNICO (Bloqueante):
+		 * La tarea de la aplicación que llame a esta función se quedará en estado
+		 * 'Blocked' (sin consumir CPU) hasta que la tarea Gatekeeper RX coloque
+		 * un elemento dentro de queue_rx. Cuando eso pase, el dato se copiará
+		 * directamente en la dirección apuntada por p_data. */
+		xQueueReceive(p_task_i2c_dta->queue_rx, p_data, portMAX_DELAY);
+	}
 }
 
 void ioctl_i2c(I2C_HandleTypeDef *h_i2c_device)

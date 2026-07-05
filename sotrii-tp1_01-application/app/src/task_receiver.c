@@ -68,6 +68,8 @@ void task_receiver(void *parameters)
 {
 	/*  Declare & Initialize Task Function variables */
 	g_task_receiver_cnt = G_TASK_RECEIVER_CNT_INI;
+	uint8_t received_data = 0; // Variable local para almacenar lo leído
+	extern I2C_HandleTypeDef hi2c1; // Referencia al handle de la HAL
 
 	/* Print out: Task Initialized */
 	LOGGER_INFO(" ");
@@ -78,6 +80,9 @@ void task_receiver(void *parameters)
     {
 		/* Update Task Counter */
 		g_task_receiver_cnt++;
+
+		/* Llamada Sincrónica: La tarea se duerme aquí si no hay datos listos */
+		read_i2c(&hi2c1, &received_data);
 
     	/* Print out: Wait 250mS */
 		LOGGER_INFO(p_task_receiver_wait_250mS);

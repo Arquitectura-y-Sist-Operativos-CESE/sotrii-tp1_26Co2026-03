@@ -53,7 +53,7 @@ extern void open_i2c(I2C_HandleTypeDef *h_i2c_device);
 extern void release_i2c(I2C_HandleTypeDef *h_i2c_device);
 
 extern void write_i2c(I2C_HandleTypeDef *h_i2c_device, uint16_t address, uint8_t data);
-extern void read_i2c(I2C_HandleTypeDef *h_i2c_device);
+extern void read_i2c(I2C_HandleTypeDef *h_i2c_device, uint8_t *p_data);
 
 extern void ioctl_i2c(I2C_HandleTypeDef *h_i2c_device);
 
