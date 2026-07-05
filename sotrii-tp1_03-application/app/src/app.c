@@ -47,6 +47,7 @@
 #include "task_receiver.h"
 #include "task_adc.h"
 #include "task_adc_interface.h"
+#include "task_adc_attribute.h"
 
 /********************** macros and definitions *******************************/
 #define G_APP_TICK_CNT_INI				0ul
@@ -66,7 +67,7 @@ const char *p_app__	= "(Source => CESE - Sistemas Operativos de Tiempo Real)";
 uint32_t volatile g_app_tick_cnt;
 uint32_t g_task_idle_cnt;
 uint32_t g_app_stack_overflow_cnt;
-
+extern void task_adc_rx(void *parameters);
 /* Declare a variable of type QueueHandle_t. This is used to reference queues*/
 
 /* Declare a variable of type SemaphoreHandle_t (binary or counting) or mutex.
@@ -76,6 +77,7 @@ uint32_t g_app_stack_overflow_cnt;
 /* Declare a variable of type TaskHandle_t. This is used to reference threads. */
 TaskHandle_t h_task_sender;
 TaskHandle_t h_task_receiver;
+TaskHandle_t h_task_adc = NULL;
 
 /********************** external functions definition ************************/
 void app_init(void)
@@ -118,14 +120,21 @@ void app_init(void)
 					  (tskIDLE_PRIORITY + 1ul),			/* This task will run at priority 1. */
 					  &h_task_receiver);				/* We are using a variable as task handle. */
 
-    /* Check the thread was created successfully. */
-    configASSERT(pdPASS == ret);
+	/* Check the thread was created successfully. */
+	configASSERT(pdPASS == ret);
 
-    /* Total amount of heap space that remains unallocated. Is also available
-     * with xFreeBytesRemaining variable for heap management schemes 2 to 5.
-     * Memory array used by heap_4 is specified as:
-     * uint8_t ucHeap[configTOTAL_HEAP_SIZE]; */
-    ret = xPortGetFreeHeapSize();
+	/* --- Crear Tarea Gatekeeper (ADC RX) --- */
+	/* Le pasamos (void *)&g_adc_device_1 como parámetro */
+	ret = xTaskCreate(task_adc_rx, "Task ADC Gatekeeper",
+			(2 * configMINIMAL_STACK_SIZE), (void*) &g_adc_device_1,
+			(tskIDLE_PRIORITY + 2ul), &h_task_adc);
+	configASSERT(pdPASS == ret);
+
+	/* Total amount of heap space that remains unallocated. Is also available
+	 * with xFreeBytesRemaining variable for heap management schemes 2 to 5.
+	 * Memory array used by heap_4 is specified as:
+	 * uint8_t ucHeap[configTOTAL_HEAP_SIZE]; */
+	ret = xPortGetFreeHeapSize();
 
     /* There is no dedicated list for task in Running mode (as we have only
      * one task in this state at the moment), but the currently run task ID

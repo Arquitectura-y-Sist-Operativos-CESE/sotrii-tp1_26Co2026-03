@@ -35,6 +35,8 @@
 /********************** inclusions *******************************************/
 /* Project includes */
 #include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 /* Demo includes */
 #include "logger.h"
@@ -42,6 +44,7 @@
 
 /* Application & Tasks includes */
 #include "board.h"
+#include "task_adc_attribute.h"
 
 /********************** macros and definitions *******************************/
 #define HAL_XXXX_CALLBACK_CNT_INI			0ul
@@ -97,14 +100,21 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   * @retval None
   */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
-{
+ {
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	// Check which version of the adc triggered this callback
-	if (hadc->Instance == ADC1)
-	{
+	if (hadc->Instance == ADC1) {
 		hal_xxxx_callback_flag = true;
 		hal_xxxx_callback_cnt++;
-
 		hal_xxxx_callback_runtime_us = cycle_counter_get_time_us();
+		/* Notificamos al Gatekeeper (task_adc_rx) que hay datos listos en el Spooler */
+		if (h_task_adc != NULL) {
+			vTaskNotifyGiveFromISR(h_task_adc, &xHigherPriorityTaskWoken);
+
+			/* Forzar un cambio de contexto si la tarea despertada tiene mayor prioridad */
+			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+		}
+
 	}
 }
 
