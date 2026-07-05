@@ -77,3 +77,21 @@ Se modificó la firma de `read_i2c` para devolver el dato leído mediante un pun
 **`task_i2c_interface.h`:**
 ```c
 extern void read_i2c(I2C_HandleTypeDef *h_i2c_device, uint8_t *p_data);
+```
+---
+# Observaciones y Medición WCET
+
+## 1. Comportamiento Observado
+Al implementar el driver I2C utilizando el patrón Gatekeeper y sincronización mediante colas (`xQueueSend` / `xQueueReceive`), se observó el siguiente comportamiento:
+* **Sincronización:** Las tareas de aplicación (`task_sender` y `task_receiver`) pasan correctamente al estado **Blocked** gracias al uso de `portMAX_DELAY`, liberando la CPU.
+* **Gatekeeper:** El acceso físico al bus I2C queda estrictamente limitado a las tareas internas del driver (`task_i2c_tx` y `task_i2c_rx`), evitando colisiones o condiciones de carrera en el hardware.
+* **Robustez:** La tarea RX valida el estado `HAL_OK` y descarta los bytes vacíos (`0x00`), optimizando el uso de la cola de recepción.
+
+## 2. Medición de WCET (Worst Case Execution Time)
+Las mediciones se realizaron utilizando el contador de ciclos (DWT) del microcontrolador STM32, rodeando las primitivas bloqueantes de la HAL (`HAL_I2C_Master_Transmit` y `HAL_I2C_Master_Receive`).
+
+* **Función de Interfaz TX (Driver I2C):** `[COMPLETAR_CON_TU_MEDICION] µs`
+* **Función de Interfaz RX (Driver I2C):** `[COMPLETAR_CON_TU_MEDICION] µs`
+
+**Conclusión de la medición:**
+Se observa que el método de *polling* retiene a la CPU durante el tiempo de transmisión/recepción de los bytes en el bus I2C. [Agregar comentario sobre si el tiempo medido era el esperado según la velocidad del bus I2C configurada].

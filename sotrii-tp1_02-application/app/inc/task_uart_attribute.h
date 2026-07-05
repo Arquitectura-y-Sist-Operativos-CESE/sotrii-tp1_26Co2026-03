@@ -34,13 +34,17 @@
 
 #ifndef TASK_UART_ATTRIBUTE_H_
 #define TASK_UART_ATTRIBUTE_H_
-
+#define UART_DRIVERS_MAX_INSTANCES   2   /* Soporte para hasta 2 canales simultáneos (ej. UART1 y UART2) */
+#define UART_QUEUE_MAX_ITEMS         16  /* Capacidad de mensajes en colas en espera */
 /********************** CPP guard ********************************************/
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /********************** inclusions *******************************************/
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
 
 /********************** macros ***********************************************/
 
@@ -48,7 +52,30 @@ extern "C" {
 /* Structure of Task */
 
 
-/* Structure of UART Tx */
+/* Estructura interna de control del driver */
+typedef struct {
+    uint32_t            device_id;
+    UART_HandleTypeDef* h_uart_device;
+    QueueHandle_t       tx_queue;       /* Transportará elementos del tipo task_uart_tx_dta_t */
+    QueueHandle_t       rx_queue;       /* Transportará elementos del tipo task_uart_rx_dta_t */
+    TaskHandle_t        tx_task_handle; /* Gatekeeper TX */
+    TaskHandle_t        rx_task_handle; /* Gatekeeper RX */
+    bool                is_active;      /* Flag de instancia inicializada */
+} uart_driver_t;
+
+/* Estructura para el Spooler de Transmisión Dinámica */
+typedef struct
+{
+    uint8_t* p_buffer;  /* Puntero al bloque creado dinámicamente con pvPortMalloc */
+    uint16_t size;      /* Cantidad de bytes reales del bloque */
+} task_uart_tx_dta_t;
+
+/* Estructura para el Spooler de Recepción Dinámica */
+typedef struct
+{
+    uint8_t* p_buffer;  /* Puntero al bloque dinámico donde el Gatekeeper alojó la recepción */
+    uint16_t size;      /* Cantidad de bytes recibidos */
+} task_uart_rx_dta_t;
 
 
 /********************** external data declaration ****************************/

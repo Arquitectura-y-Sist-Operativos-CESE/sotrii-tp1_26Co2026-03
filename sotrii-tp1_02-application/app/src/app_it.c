@@ -42,6 +42,9 @@
 
 /* Application & Tasks includes */
 #include "board.h"
+#include "task_uart_attribute.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 /********************** macros and definitions *******************************/
 #define HAL_XXXX_CALLBACK_CNT_INI			0ul
@@ -57,6 +60,7 @@
 volatile bool hal_xxxx_callback_flag;
 volatile uint32_t hal_xxxx_callback_cnt;
 volatile uint32_t hal_xxxx_callback_runtime_us;
+extern uart_driver_t g_drivers[];
 
 /********************** external functions definition ************************/
 void app_it_init(void)
@@ -96,13 +100,41 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
 	// Check which version of the uart triggered this callback
-	if (huart->Instance == USART2)
-	{
-		hal_xxxx_callback_flag = true;
-		hal_xxxx_callback_cnt++;
 
-		hal_xxxx_callback_runtime_us = cycle_counter_get_time_us();
-	}
+	/* Buscamos en qué ranura está el driver que generó esta interrupción */
+	    for (int i = 0; i < UART_DRIVERS_MAX_INSTANCES; i++) {
+	        if (g_drivers[i].is_active && (g_drivers[i].h_uart_device->Instance == huart->Instance)) {
+
+	            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	    		hal_xxxx_callback_flag = true;
+	    		hal_xxxx_callback_cnt++;
+	    		hal_xxxx_callback_runtime_us = cycle_counter_get_time_us();
+
+	            /* Despertamos al Gatekeeper de Transmisión (TX) de ese driver específico */
+	            vTaskNotifyGiveFromISR(g_drivers[i].tx_task_handle, &xHigherPriorityTaskWoken);
+
+	            /* Forzamos al procesador a saltar a la tarea recién despertada si es importante */
+	            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	            break;
+	        }
+	    }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    /* Buscamos en qué ranura está el driver que generó esta interrupción */
+    for (int i = 0; i < UART_DRIVERS_MAX_INSTANCES; i++) {
+        if (g_drivers[i].is_active && (g_drivers[i].h_uart_device->Instance == huart->Instance)) {
+
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+            /* Despertamos al Gatekeeper de Recepción (RX) de ese driver específico */
+            vTaskNotifyGiveFromISR(g_drivers[i].rx_task_handle, &xHigherPriorityTaskWoken);
+
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+            break;
+        }
+    }
 }
 
 /********************** end of file ******************************************/
