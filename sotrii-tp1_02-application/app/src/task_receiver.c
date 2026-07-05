@@ -50,14 +50,14 @@
 #define G_TASK_RECEIVER_CNT_INI	0ul
 
 #define TASK_RECEIVER_DEL_ZERO		(pdMS_TO_TICKS(0ul))
-#define TASK_RECEIVER_DEL_MAX		(pdMS_TO_TICKS(250ul))
+#define TASK_RECEIVER_DEL_MAX		(pdMS_TO_TICKS(10ul))
 
 /********************** internal data declaration ****************************/
 
 /********************** internal functions declaration ***********************/
 
 /********************** internal data definition *****************************/
-const char *p_task_receiver_wait_250mS		= "   ==> Task RECEIVER - Wait:   250mS";
+const char *p_task_receiver_wait_250mS		= "   ==> Task RECEIVER - Wait:    10mS";
 
 /********************** external data declaration ****************************/
 uint32_t g_task_receiver_cnt;
@@ -66,6 +66,14 @@ uint32_t g_task_receiver_cnt;
 /* Task thread */
 void task_receiver(void *parameters)
 {
+	task_uart_echo_dta_t task_uart_echo_dta;
+	char rx_text[17];
+	uint16_t rx_size;
+	uint16_t i;
+	task_uart_status_t status;
+
+	UNUSED(parameters);
+
 	/*  Declare & Initialize Task Function variables */
 	g_task_receiver_cnt = G_TASK_RECEIVER_CNT_INI;
 
@@ -79,8 +87,35 @@ void task_receiver(void *parameters)
 		/* Update Task Counter */
 		g_task_receiver_cnt++;
 
-    	/* Print out: Wait 250mS */
-		LOGGER_INFO(p_task_receiver_wait_250mS);
+		/* Echo demo: drain the UART RX driver and forward received blocks to
+		 * task_sender through an application queue. */
+		do
+		{
+			status = read_uart(&huart2, task_uart_echo_dta.data, sizeof(task_uart_echo_dta.data), &rx_size);
+			if (TASK_UART_STATUS_OK == status)
+			{
+				task_uart_echo_dta.size = rx_size;
+				//LOGGER_INFO("   ==> Task RECEIVER - UART bytes received: %u", (unsigned int)rx_size);
+				for (i = 0u; (i < rx_size) && (i < (sizeof(rx_text) - 1u)); i++)
+				{
+					rx_text[i] = (char)task_uart_echo_dta.data[i];
+				}
+				//rx_text[i] = '\0';
+				//LOGGER_INFO("   ==> Task RECEIVER - UART data: %s", rx_text);
+
+				if (pdTRUE != xQueueSend(h_queue_uart_echo, &task_uart_echo_dta, 0u))
+				{
+					LOGGER_INFO("   ==> Task RECEIVER - UART echo queue full");
+				}
+			}
+			else if (TASK_UART_STATUS_EMPTY != status)
+			{
+				LOGGER_INFO("   ==> Task RECEIVER - UART read error status: %d", (int)status);
+			}
+		} while (TASK_UART_STATUS_OK == status);
+
+    	/* Print out: Wait 10mS */
+		// LOGGER_INFO(p_task_receiver_wait_250mS);
 		vTaskDelay(TASK_RECEIVER_DEL_MAX);
 	}
 }

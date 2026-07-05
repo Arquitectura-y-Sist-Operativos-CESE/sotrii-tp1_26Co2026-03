@@ -43,6 +43,7 @@
 
 /* Application & Tasks includes */
 #include "board.h"
+#include "app.h"
 #include "app_it.h"
 #include "task_sender.h"
 #include "task_receiver.h"
@@ -69,6 +70,7 @@ uint32_t g_task_idle_cnt;
 uint32_t g_app_stack_overflow_cnt;
 
 /* Declare a variable of type QueueHandle_t. This is used to reference queues*/
+QueueHandle_t h_queue_uart_echo;
 
 /* Declare a variable of type SemaphoreHandle_t (binary or counting) or mutex.
  * This is used to reference the semaphore that is used to synchronize a thread
@@ -102,7 +104,11 @@ void app_init(void)
      *
      * Add queue or semaphore (binary or counting) or mutex to registry. */
 
-	/* The queue is created to hold a maximum of 5 task_led_ev_t values. */
+	/* The queue is created to hold a maximum of TASK_UART_ECHO_QUEUE_LENGTH
+	 * task_uart_echo_dta_t values. */
+	h_queue_uart_echo = xQueueCreate(TASK_UART_ECHO_QUEUE_LENGTH, sizeof(task_uart_echo_dta_t));
+	configASSERT(NULL != h_queue_uart_echo);
+	vQueueAddToRegistry(h_queue_uart_echo, "UART Echo Queue");
 
 	/* The semaphore is created in the 'empty' state, meaning the semaphore
 	 * must first be given using the xSemaphoreGive() API function before it can

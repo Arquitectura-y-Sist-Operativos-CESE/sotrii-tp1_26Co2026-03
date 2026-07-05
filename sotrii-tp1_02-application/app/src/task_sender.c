@@ -66,6 +66,11 @@ uint32_t g_task_sender_cnt;
 /* Task thread */
 void task_sender(void *parameters)
 {
+	task_uart_echo_dta_t task_uart_echo_dta;
+	task_uart_status_t status;
+
+	UNUSED(parameters);
+
 	/*  Declare & Initialize Task Function variables */
 	g_task_sender_cnt = G_TASK_SENDER_CNT_INI;
 
@@ -79,9 +84,18 @@ void task_sender(void *parameters)
 		/* Update Task Counter */
 		g_task_sender_cnt++;
 
+		/* Echo demo: wait for bytes received by task_receiver and send them
+		 * through the UART driver TX interface. */
+		xQueueReceive(h_queue_uart_echo, &task_uart_echo_dta, portMAX_DELAY);
+
+		status = write_uart(&huart2, task_uart_echo_dta.data, task_uart_echo_dta.size);
+		if (TASK_UART_STATUS_OK != status)
+		{
+			LOGGER_INFO("   ==> Task SENDER - UART write error status: %d", (int)status);
+		}
+
     	/* Print out: Wait 250mS */
-		LOGGER_INFO(p_task_sender_wait_250mS);
-		vTaskDelay(TASK_SENDER_DEL_MAX);
+		//LOGGER_INFO(p_task_sender_wait_250mS);
 	}
 }
 

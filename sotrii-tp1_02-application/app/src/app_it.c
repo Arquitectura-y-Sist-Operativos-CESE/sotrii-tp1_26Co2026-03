@@ -42,6 +42,7 @@
 
 /* Application & Tasks includes */
 #include "board.h"
+#include "task_uart_interface.h"
 
 /********************** macros and definitions *******************************/
 #define HAL_XXXX_CALLBACK_CNT_INI			0ul
@@ -102,6 +103,22 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 		hal_xxxx_callback_cnt++;
 
 		hal_xxxx_callback_runtime_us = cycle_counter_get_time_us();
+		uart_tx_cplt_callback(huart);
+	}
+}
+
+/**
+  * @brief  Rx Transfer completed callbacks.
+  * @param  huart  Pointer to a UART_HandleTypeDef structure that contains
+  *                the configuration information for the specified UART module.
+  * @retval None
+  */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	// Check which version of the uart triggered this callback
+	if (huart->Instance == USART2)
+	{
+		uart_rx_cplt_callback(huart);
 	}
 }
 
