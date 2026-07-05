@@ -54,6 +54,7 @@
 
 #define TASK_XXXX_DEL_ZERO	(pdMS_TO_TICKS(0ul))
 #define TASK_XXXX_DEL_MAX	(pdMS_TO_TICKS(250ul))
+#define TASK_I2C_DEL_MAX	TASK_XXXX_DEL_ZERO
 
 /********************** internal data declaration ****************************/
 
@@ -65,8 +66,8 @@ void task_i2c_rx(void *parameters);
 static task_i2c_status_t task_i2c_hal_to_status(HAL_StatusTypeDef hal_status);
 
 /********************** internal data definition *****************************/
-const char *p_task_i2c_tx_wait_250mS	= "   ==> Task I2C TX - Wait:   250mS";
-const char *p_task_i2c_rx_wait_250mS	= "   ==> Task I2C RX - Wait:   250mS";
+const char *p_task_i2c_tx_wait_250mS	= "   ==> Task I2C TX - Wait:     0mS";
+const char *p_task_i2c_rx_wait_250mS	= "   ==> Task I2C RX - Wait:     0mS";
 
 /********************** external data declaration ****************************/
 uint32_t g_task_xxxx_tx_cnt;
@@ -110,15 +111,15 @@ void task_i2c_tx(void *parameters)
 		/* Polling peripheral access is owned by the TX gatekeeper. The driver
 		 * stores a portable status and releases the blocked write_i2c() caller. */
 		xSemaphoreTake(p_task_i2c_tx_dta->mutex_bus, portMAX_DELAY);
-		p_task_i2c_tx_dta->tx_status = task_i2c_hal_to_status(HAL_I2C_Master_Transmit(p_task_i2c_tx_dta->device_id, (task_i2c_tx_dta.address << 1), task_i2c_tx_dta.data, task_i2c_tx_dta.size, HAL_MAX_DELAY));
+		p_task_i2c_tx_dta->tx_status = task_i2c_hal_to_status(HAL_I2C_Master_Transmit(p_task_i2c_tx_dta->device_id, (task_i2c_tx_dta.address << 1), task_i2c_tx_dta.data, task_i2c_tx_dta.size, TASK_I2C_HAL_TIMEOUT_MS));
 		xSemaphoreGive(p_task_i2c_tx_dta->mutex_bus);
 		xSemaphoreGive(p_task_i2c_tx_dta->sem_tx_done);
 
 		g_task_xxxx_tx_runtime_us = cycle_counter_get_time_us();
 
-    	/* Print out: Wait 250mS */
-		LOGGER_INFO(p_task_i2c_tx_wait_250mS);
-		vTaskDelay(TASK_XXXX_DEL_MAX);
+    	/* Print out: Wait according to TASK_I2C_DEL_MAX */
+		/* LOGGER_INFO(p_task_i2c_tx_wait_250mS); */
+		vTaskDelay(TASK_I2C_DEL_MAX);
 	}
 }
 
@@ -154,19 +155,19 @@ void task_i2c_rx(void *parameters)
 		/* Register-based read sequence: first send the register address, then
 		 * receive the requested data bytes without exposing this sequence to
 		 * application tasks. */
-		p_task_i2c_rx_dta->rx_status = task_i2c_hal_to_status(HAL_I2C_Master_Transmit(p_task_i2c_rx_dta->device_id, (task_i2c_rx_dta.address << 1), &task_i2c_rx_dta.reg, sizeof(task_i2c_rx_dta.reg), HAL_MAX_DELAY));
+		p_task_i2c_rx_dta->rx_status = task_i2c_hal_to_status(HAL_I2C_Master_Transmit(p_task_i2c_rx_dta->device_id, (task_i2c_rx_dta.address << 1), &task_i2c_rx_dta.reg, sizeof(task_i2c_rx_dta.reg), TASK_I2C_HAL_TIMEOUT_MS));
 		if (TASK_I2C_STATUS_OK == p_task_i2c_rx_dta->rx_status)
 		{
-			p_task_i2c_rx_dta->rx_status = task_i2c_hal_to_status(HAL_I2C_Master_Receive(p_task_i2c_rx_dta->device_id, (task_i2c_rx_dta.address << 1), task_i2c_rx_dta.data, task_i2c_rx_dta.size, HAL_MAX_DELAY));
+			p_task_i2c_rx_dta->rx_status = task_i2c_hal_to_status(HAL_I2C_Master_Receive(p_task_i2c_rx_dta->device_id, (task_i2c_rx_dta.address << 1), task_i2c_rx_dta.data, task_i2c_rx_dta.size, TASK_I2C_HAL_TIMEOUT_MS));
 		}
 		xSemaphoreGive(p_task_i2c_rx_dta->mutex_bus);
 		xSemaphoreGive(p_task_i2c_rx_dta->sem_rx_done);
 
 		g_task_xxxx_rx_runtime_us = cycle_counter_get_time_us();
 
-    	/* Print out: Wait 250mS */
-		LOGGER_INFO(p_task_i2c_rx_wait_250mS);
-		vTaskDelay(TASK_XXXX_DEL_MAX);
+    	/* Print out: Wait according to TASK_I2C_DEL_MAX */
+		/* LOGGER_INFO(p_task_i2c_rx_wait_250mS); */
+		vTaskDelay(TASK_I2C_DEL_MAX);
 	}
 }
 

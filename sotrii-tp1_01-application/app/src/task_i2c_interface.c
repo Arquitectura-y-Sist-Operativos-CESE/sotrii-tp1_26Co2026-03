@@ -153,9 +153,10 @@ void release_i2c(I2C_HandleTypeDef *h_i2c_device)
 	}
 }
 
-void write_i2c(I2C_HandleTypeDef *h_i2c_device, uint16_t dev_address, uint8_t *dev_data, uint16_t dev_size)
+task_i2c_status_t write_i2c(I2C_HandleTypeDef *h_i2c_device, uint16_t dev_address, uint8_t *dev_data, uint16_t dev_size)
 {
 	task_i2c_dta_t *p_task_i2c_dta = &task_i2c_dta;
+	task_i2c_status_t status = TASK_I2C_STATUS_ERROR;
 
 	p_task_i2c_dta->device_id = h_i2c_device;
 
@@ -171,15 +172,25 @@ void write_i2c(I2C_HandleTypeDef *h_i2c_device, uint16_t dev_address, uint8_t *d
 		/* Synchronous pattern: enqueue the request, then block until the
 		 * gatekeeper completes the hardware access and signals sem_tx_done. */
 		xSemaphoreTake(p_task_i2c_dta->mutex_tx, portMAX_DELAY);
+		p_task_i2c_dta->tx_status = TASK_I2C_STATUS_ERROR;
 		xQueueSend(p_task_i2c_dta->queue_tx, &task_i2c_tx_dta, portMAX_DELAY);
 		xSemaphoreTake(p_task_i2c_dta->sem_tx_done, portMAX_DELAY);
+		status = p_task_i2c_dta->tx_status;
 		xSemaphoreGive(p_task_i2c_dta->mutex_tx);
 	}
+
+	if (TASK_I2C_STATUS_OK != status)
+	{
+		LOGGER_INFO("   ==> write_i2c - error status: %d", (int)status);
+	}
+
+	return status;
 }
 
-void read_i2c(I2C_HandleTypeDef *h_i2c_device, uint16_t dev_address, uint8_t dev_reg, uint8_t *dev_data, uint16_t dev_size)
+task_i2c_status_t read_i2c(I2C_HandleTypeDef *h_i2c_device, uint16_t dev_address, uint8_t dev_reg, uint8_t *dev_data, uint16_t dev_size)
 {
 	task_i2c_dta_t *p_task_i2c_dta = &task_i2c_dta;
+	task_i2c_status_t status = TASK_I2C_STATUS_ERROR;
 
 	p_task_i2c_dta->device_id = h_i2c_device;
 
@@ -196,10 +207,19 @@ void read_i2c(I2C_HandleTypeDef *h_i2c_device, uint16_t dev_address, uint8_t dev
 		/* Synchronous pattern: enqueue the request, then block until the
 		 * gatekeeper completes the hardware access and signals sem_rx_done. */
 		xSemaphoreTake(p_task_i2c_dta->mutex_rx, portMAX_DELAY);
+		p_task_i2c_dta->rx_status = TASK_I2C_STATUS_ERROR;
 		xQueueSend(p_task_i2c_dta->queue_rx, &task_i2c_rx_dta, portMAX_DELAY);
 		xSemaphoreTake(p_task_i2c_dta->sem_rx_done, portMAX_DELAY);
+		status = p_task_i2c_dta->rx_status;
 		xSemaphoreGive(p_task_i2c_dta->mutex_rx);
 	}
+
+	if (TASK_I2C_STATUS_OK != status)
+	{
+		LOGGER_INFO("   ==> read_i2c - error status: %d", (int)status);
+	}
+
+	return status;
 }
 
 void ioctl_i2c(I2C_HandleTypeDef *h_i2c_device)

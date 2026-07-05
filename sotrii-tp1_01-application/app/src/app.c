@@ -47,6 +47,7 @@
 #include "task_sender.h"
 #include "task_receiver.h"
 #include "task_i2c.h"
+#include "task_i2c_demo.h"
 #include "task_i2c_interface.h"
 
 /********************** macros and definitions *******************************/
@@ -77,6 +78,10 @@ uint32_t g_app_stack_overflow_cnt;
 /* Declare a variable of type TaskHandle_t. This is used to reference threads. */
 TaskHandle_t h_task_sender;
 TaskHandle_t h_task_receiver;
+TaskHandle_t h_task_i2c_demo;
+QueueHandle_t h_queue_i2c_demo_to_sender;
+QueueHandle_t h_queue_i2c_demo_to_receiver;
+QueueHandle_t h_queue_i2c_receiver_to_demo;
 
 /********************** external functions definition ************************/
 void app_init(void)
@@ -111,6 +116,18 @@ void app_init(void)
 	/* Add threads, ... */
     BaseType_t ret;
 
+    h_queue_i2c_demo_to_sender = xQueueCreate(I2C_DEMO_QUEUE_LENGTH, sizeof(i2c_demo_sender_cmd_t));
+    configASSERT(NULL != h_queue_i2c_demo_to_sender);
+    vQueueAddToRegistry(h_queue_i2c_demo_to_sender, "I2C Demo To Sender");
+
+    h_queue_i2c_demo_to_receiver = xQueueCreate(I2C_DEMO_QUEUE_LENGTH, sizeof(i2c_demo_receiver_cmd_t));
+    configASSERT(NULL != h_queue_i2c_demo_to_receiver);
+    vQueueAddToRegistry(h_queue_i2c_demo_to_receiver, "I2C Demo To Receiver");
+
+    h_queue_i2c_receiver_to_demo = xQueueCreate(I2C_DEMO_QUEUE_LENGTH, sizeof(i2c_demo_receiver_data_t));
+    configASSERT(NULL != h_queue_i2c_receiver_to_demo);
+    vQueueAddToRegistry(h_queue_i2c_receiver_to_demo, "I2C Receiver To Demo");
+
     /* Task Sender thread at priority 1 */
     ret = xTaskCreate(task_sender,						/* Pointer to the function thats implement the task. */
 					  "Task Sender",					/* Text name for the task. This is to facilitate debugging only. */
@@ -133,6 +150,17 @@ void app_init(void)
     /* Check the thread was created successfully. */
     configASSERT(pdPASS == ret);
 
+    /* Task I2C Demo thread at priority 1 */
+    ret = xTaskCreate(task_i2c_demo,					/* Pointer to the function thats implement the task. */
+					  "Task I2C Demo",					/* Text name for the task. This is to facilitate debugging only. */
+					  (2 * configMINIMAL_STACK_SIZE),	/* Stack depth in words. */
+					  NULL,								/* We are not using the task parameter. */
+					  (tskIDLE_PRIORITY + 1ul),			/* This task will run at priority 1. */
+					  &h_task_i2c_demo);				/* We are using a variable as task handle. */
+
+    /* Check the thread was created successfully. */
+    configASSERT(pdPASS == ret);
+
     /* Total amount of heap space that remains unallocated. Is also available
      * with xFreeBytesRemaining variable for heap management schemes 2 to 5.
      * Memory array used by heap_4 is specified as:
@@ -143,7 +171,7 @@ void app_init(void)
      * one task in this state at the moment), but the currently run task ID
      * is stored in variable pxCurrentTCB */
 
-    /* I2C Device Diver Init */
+    /* I2C Device Driver Init */
     open_i2c(&hi2c1);
 
     /* Application Interrupts Init */
