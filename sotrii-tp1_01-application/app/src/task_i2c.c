@@ -119,7 +119,7 @@ void task_i2c_tx(void *parameters)
 
     	/* Print out: Wait according to TASK_I2C_DEL_MAX */
 		/* LOGGER_INFO(p_task_i2c_tx_wait_250mS); */
-		vTaskDelay(TASK_I2C_DEL_MAX);
+		vTaskDelay(TASK_XXXX_DEL_ZERO);
 	}
 }
 
@@ -167,7 +167,7 @@ void task_i2c_rx(void *parameters)
 
     	/* Print out: Wait according to TASK_I2C_DEL_MAX */
 		/* LOGGER_INFO(p_task_i2c_rx_wait_250mS); */
-		vTaskDelay(TASK_I2C_DEL_MAX);
+		vTaskDelay(TASK_XXXX_DEL_ZERO);
 	}
 }
 
