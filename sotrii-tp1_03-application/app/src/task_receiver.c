@@ -61,40 +61,43 @@ const char *p_task_receiver_wait_250mS		= "   ==> Task RECEIVER - Wait:   250mS"
 
 /********************** external data declaration ****************************/
 uint32_t g_task_receiver_cnt;
+extern ADC_HandleTypeDef hadc1;
 
 /********************** external functions definition ************************/
 /* Task thread */
 void task_receiver(void *parameters)
 {
-    /* Evitar advertencia del compilador por parámetro no usado */
-    (void)parameters;
-    
-    /* Variable para almacenar el dato recibido */
-    uint8_t rx_byte;
+	/*  Declare & Initialize Task Function variables */
+	g_task_receiver_cnt = G_TASK_RECEIVER_CNT_INI;
+	uint32_t current_adc_value = 0;
 
-    /* Print out: Task Initialized */
-    LOGGER_INFO(" ");
-    LOGGER_INFO("  %s is running - Tick [mS] = %lu", pcTaskGetName(NULL), xTaskGetTickCount());
+	/* Print out: Task Initialized */
+	LOGGER_INFO(" ");
+	LOGGER_INFO("  %s is running - Tick [mS] = %lu", pcTaskGetName(NULL), xTaskGetTickCount());
 
-    /* Bucle infinito de la tarea */
-    for (;;)
+	/* As per most tasks, this task is implemented in an infinite loop. */
+	for (;;)
     {
-        /* * 1. LECTURA ASINCRÓNICA Y BLOQUEANTE:
-         * Llamamos a la API de nuestro driver pidiendo 1 byte. 
-         * ¡ATENCIÓN!: Si no hay datos en la cola (Spooler), esta función NO devuelve error,
-         * sino que bloquea la tarea (estado Blocked). La CPU queda 100% libre para otras 
-         * tareas hasta que la interrupción de RX despierte al Gatekeeper, y el Gatekeeper 
-         * ponga el dato en la cola.
-         */
-        read_uart(&huart2, &rx_byte, 1);
+		/* Update Task Counter */
+				g_task_receiver_cnt++;
 
-        /* * 2. PROCESAMIENTO DEL DATO:
-         * Si llegamos a esta línea, es porque indefectiblemente recibimos 1 byte.
-         * Lo imprimimos por la consola de log.
-         */
-        LOGGER_INFO("RX: Se recibio el caracter '%c' (ASCII: %d)", rx_byte, rx_byte);
-        
-    }
+				/* --- Consumir datos del Driver --- */
+				/* Intentamos leer el último valor del ADC usando nuestra API segura */
+				if (read_adc(&hadc1, &current_adc_value) == pdPASS) {
+
+					/* Lectura exitosa: mostramos el valor por consola */
+					LOGGER_INFO("Task RECEIVER - ADC Value: %lu", current_adc_value);
+
+				} else {
+
+					/* Fallo al leer (Driver no inicializado, punteros nulos, o cola vacía) */
+					LOGGER_INFO("Task RECEIVER - ADC Read Failed or No Data");
+
+				}
+
+				/* Send the task to the blocked state for 250 mS */
+				vTaskDelay(TASK_RECEIVER_DEL_MAX);
+	}
 }
 
 /********************** end of file ******************************************/
