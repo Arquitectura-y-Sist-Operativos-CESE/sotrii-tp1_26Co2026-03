@@ -63,7 +63,7 @@ En esta sección se detallan las decisiones de diseño y las métricas obtenidas
 
 Reemplazar el siguiente placeholder por una captura/foto del setup real utilizado para la prueba del ADC. La evidencia esperada es la conexion entre la placa STM32 Nucleo y la fuente/potenciometro usado para inyectar la tension analogica al canal ADC configurado.
 
-![Placeholder setup ADC](doc/img/setup_adc_placeholder.png)
+![Placeholder setup ADC](doc/img/setup_adc_placeholder.jpeg)
 
 ## Observaciones y Medicion de WCET (Worst-Case Execution Time)
 
