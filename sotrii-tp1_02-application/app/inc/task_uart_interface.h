@@ -41,6 +41,7 @@ extern "C" {
 #endif
 
 /********************** inclusions *******************************************/
+#include "task_uart_attribute.h"
 
 /********************** macros ***********************************************/
 
@@ -52,10 +53,13 @@ extern "C" {
 extern void open_uart(UART_HandleTypeDef *h_uart_device);
 extern void release_uart(UART_HandleTypeDef *h_uart_device);
 
-extern void write_uart(UART_HandleTypeDef *h_uart_device);
-extern void read_uart(UART_HandleTypeDef *h_uart_device);
+extern task_uart_status_t write_uart(UART_HandleTypeDef *h_uart_device, uint8_t *data, uint16_t size);
+extern task_uart_status_t read_uart(UART_HandleTypeDef *h_uart_device, uint8_t *data, uint16_t size, uint16_t *read_size);
 
 extern void ioctl_uart(UART_HandleTypeDef *h_uart_device);
+extern bool uart_is_active_instance(UART_HandleTypeDef *h_uart_device);
+extern void uart_tx_cplt_callback(UART_HandleTypeDef *h_uart_device);
+extern void uart_rx_cplt_callback(UART_HandleTypeDef *h_uart_device);
 
 /********************** End of CPP guard *************************************/
 #ifdef __cplusplus

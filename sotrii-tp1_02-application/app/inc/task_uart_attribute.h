@@ -41,14 +41,77 @@ extern "C" {
 #endif
 
 /********************** inclusions *******************************************/
+#include "cmsis_os.h"
 
 /********************** macros ***********************************************/
+#define TASK_UART_TX_QUEUE_LENGTH	5
+#define TASK_UART_RX_QUEUE_LENGTH	32
+#define TASK_UART_TX_SPOOLER_LENGTH	256
+#define TASK_UART_RX_SPOOLER_LENGTH	256
+#define TASK_UART_TX_CHUNK_LENGTH	32
+#define TASK_UART_MAX_DEVICES		2
 
 /********************** typedef **********************************************/
-/* Structure of Task */
+typedef enum
+{
+	TASK_UART_STATUS_OK = 0,
+	TASK_UART_STATUS_ERROR,
+	TASK_UART_STATUS_BUSY,
+	TASK_UART_STATUS_TIMEOUT,
+	TASK_UART_STATUS_EMPTY,
+	TASK_UART_STATUS_FULL
+} task_uart_status_t;
 
+typedef enum
+{
+	TASK_UART_EVENT_DATA_READY = 0
+} task_uart_event_t;
+
+typedef struct
+{
+	uint8_t *		buffer;
+	uint16_t		length;
+	uint16_t		head;
+	uint16_t		tail;
+	uint16_t		count;
+} task_uart_spooler_t;
+
+/* Structure of Task */
+typedef struct
+{
+	UART_HandleTypeDef *	device_id;
+
+	/* Active slot in the UART driver table. Used to route HAL callbacks by
+	 * peripheral instance instead of hardcoding USARTx in app_it.c. */
+	bool					is_active;
+
+	TaskHandle_t			task_tx;
+	TaskHandle_t			task_rx;
+
+	QueueHandle_t			queue_tx;
+	QueueHandle_t			queue_rx;
+
+	SemaphoreHandle_t		mutex_tx_spooler;
+	SemaphoreHandle_t		sem_tx_done;
+	task_uart_spooler_t		tx_spooler;
+	task_uart_status_t		tx_status;
+
+	task_uart_spooler_t		rx_spooler;
+	uint8_t					rx_byte;
+	task_uart_status_t		rx_status;
+} task_uart_dta_t;
 
 /* Structure of UART Tx */
+typedef struct
+{
+	task_uart_event_t	event;
+} task_uart_tx_dta_t;
+
+/* Structure of UART Rx */
+typedef struct
+{
+	task_uart_event_t	event;
+} task_uart_rx_dta_t;
 
 
 /********************** external data declaration ****************************/

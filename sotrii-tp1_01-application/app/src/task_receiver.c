@@ -44,6 +44,7 @@
 /* Application & Tasks includes */
 #include "board.h"
 #include "app.h"
+#include "task_i2c_demo.h"
 #include "task_i2c_interface.h"
 
 /********************** macros and definitions *******************************/
@@ -58,6 +59,7 @@
 
 /********************** internal data definition *****************************/
 const char *p_task_receiver_wait_250mS		= "   ==> Task RECEIVER - Wait:   250mS";
+const char *p_task_receiver_wait_cmnd		= "   ==> Task RECEIVER - Wait:   Command from Demo Task";
 
 /********************** external data declaration ****************************/
 uint32_t g_task_receiver_cnt;
@@ -66,6 +68,11 @@ uint32_t g_task_receiver_cnt;
 /* Task thread */
 void task_receiver(void *parameters)
 {
+	i2c_demo_receiver_cmd_t cmd;
+	i2c_demo_receiver_data_t data;
+
+	UNUSED(parameters);
+
 	/*  Declare & Initialize Task Function variables */
 	g_task_receiver_cnt = G_TASK_RECEIVER_CNT_INI;
 
@@ -75,13 +82,22 @@ void task_receiver(void *parameters)
 
 	/* As per most tasks, this task is implemented in an infinite loop. */
 	for (;;)
-    {
+	{
+		/* Print out: Wait for a command from the demo task */
+		/* LOGGER_INFO(p_task_receiver_wait_cmnd); */
+		xQueueReceive(h_queue_i2c_demo_to_receiver, &cmd, portMAX_DELAY);
+
 		/* Update Task Counter */
 		g_task_receiver_cnt++;
 
-    	/* Print out: Wait 250mS */
-		LOGGER_INFO(p_task_receiver_wait_250mS);
-		vTaskDelay(TASK_RECEIVER_DEL_MAX);
+		/* The demo task defines what to read. Receiver only executes it. */
+		data.size = cmd.size;
+		data.status = read_i2c(&hi2c1, cmd.address, cmd.reg, data.data, data.size);
+		if (TASK_I2C_STATUS_OK != data.status)
+		{
+			LOGGER_INFO("   ==> Task RECEIVER - I2C read error status: %d", (int)data.status);
+		}
+		xQueueOverwrite(h_queue_i2c_receiver_to_demo, &data);
 	}
 }
 

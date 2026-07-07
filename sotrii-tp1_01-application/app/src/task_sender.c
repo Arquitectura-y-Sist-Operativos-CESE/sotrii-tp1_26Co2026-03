@@ -44,6 +44,7 @@
 /* Application & Tasks includes */
 #include "board.h"
 #include "app.h"
+#include "task_i2c_demo.h"
 #include "task_i2c_interface.h"
 
 /********************** macros and definitions *******************************/
@@ -58,6 +59,7 @@
 
 /********************** internal data definition *****************************/
 const char *p_task_sender_wait_250mS		= "   ==> Task SENDER - Wait:   250mS";
+const char *p_task_sender_wait_cmnd		    = "   ==> Task SENDER - Wait:   Command from Demo Task";
 
 /********************** external data declaration ****************************/
 uint32_t g_task_sender_cnt;
@@ -66,6 +68,11 @@ uint32_t g_task_sender_cnt;
 /* Task thread */
 void task_sender(void *parameters)
 {
+	i2c_demo_sender_cmd_t cmd;
+	task_i2c_status_t status;
+
+	UNUSED(parameters);
+
 	/*  Declare & Initialize Task Function variables */
 	g_task_sender_cnt = G_TASK_SENDER_CNT_INI;
 
@@ -74,9 +81,6 @@ void task_sender(void *parameters)
 	 * https://www.ti.com/product/PCF8574
  	 * dev_address = (address base | jumper less address)
  	 */
-	uint16_t dev_address = 0x27;
-	uint8_t dev_data = 0x55;
-
 	/* Print out: Task Initialized */
 	LOGGER_INFO(" ");
 	LOGGER_INFO("  %s is running - Tick [mS] = %lu", pcTaskGetName(NULL), xTaskGetTickCount());
@@ -84,16 +88,19 @@ void task_sender(void *parameters)
 	/* As per most tasks, this task is implemented in an infinite loop. */
 	for (;;)
 	{
+		/* Print out: Wait for a command from the demo task */
+		/* LOGGER_INFO(p_task_sender_wait_cmnd); */
+		xQueueReceive(h_queue_i2c_demo_to_sender, &cmd, portMAX_DELAY);
+
 		/* Update Task Counter */
 		g_task_sender_cnt++;
 
-		/* I2C Device Diver Write */
-		dev_data = ~dev_data;
-		write_i2c(&hi2c1, dev_address, dev_data);
-
-    	/* Print out: Wait 250mS */
-		LOGGER_INFO(p_task_sender_wait_250mS);
-		vTaskDelay(TASK_SENDER_DEL_MAX);
+		/* The demo task builds the complete write frame. Sender only executes it. */
+		status = write_i2c(&hi2c1, cmd.address, cmd.data, cmd.size);
+		if (TASK_I2C_STATUS_OK != status)
+		{
+			LOGGER_INFO("   ==> Task SENDER - I2C write error status: %d", (int)status);
+		}
 	}
 }
 
