@@ -57,6 +57,7 @@ extern task_uart_status_t write_uart(UART_HandleTypeDef *h_uart_device, uint8_t 
 extern task_uart_status_t read_uart(UART_HandleTypeDef *h_uart_device, uint8_t *data, uint16_t size, uint16_t *read_size);
 
 extern void ioctl_uart(UART_HandleTypeDef *h_uart_device);
+extern bool uart_is_active_instance(UART_HandleTypeDef *h_uart_device);
 extern void uart_tx_cplt_callback(UART_HandleTypeDef *h_uart_device);
 extern void uart_rx_cplt_callback(UART_HandleTypeDef *h_uart_device);
 

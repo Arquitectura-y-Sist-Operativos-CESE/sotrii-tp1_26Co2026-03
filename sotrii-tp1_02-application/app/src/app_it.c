@@ -96,8 +96,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   */
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-	// Check which version of the uart triggered this callback
-	if (huart->Instance == USART2)
+	// Check which active UART driver instance triggered this callback
+	if (uart_is_active_instance(huart))
 	{
 		hal_xxxx_callback_flag = true;
 		hal_xxxx_callback_cnt++;
@@ -115,8 +115,8 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
   */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	// Check which version of the uart triggered this callback
-	if (huart->Instance == USART2)
+	// Check which active UART driver instance triggered this callback
+	if (uart_is_active_instance(huart))
 	{
 		uart_rx_cplt_callback(huart);
 	}

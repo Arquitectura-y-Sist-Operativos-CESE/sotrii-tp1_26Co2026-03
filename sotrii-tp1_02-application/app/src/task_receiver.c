@@ -48,6 +48,7 @@
 
 /********************** macros and definitions *******************************/
 #define G_TASK_RECEIVER_CNT_INI	0ul
+#define G_READ_UART_RUNTIME_US_INI	0ul
 
 #define TASK_RECEIVER_DEL_ZERO		(pdMS_TO_TICKS(0ul))
 #define TASK_RECEIVER_DEL_MAX		(pdMS_TO_TICKS(10ul))
@@ -61,6 +62,7 @@ const char *p_task_receiver_wait_250mS		= "   ==> Task RECEIVER - Wait:    10mS"
 
 /********************** external data declaration ****************************/
 uint32_t g_task_receiver_cnt;
+volatile uint32_t g_read_uart_runtime_us;
 
 /********************** external functions definition ************************/
 /* Task thread */
@@ -76,6 +78,7 @@ void task_receiver(void *parameters)
 
 	/*  Declare & Initialize Task Function variables */
 	g_task_receiver_cnt = G_TASK_RECEIVER_CNT_INI;
+	g_read_uart_runtime_us = G_READ_UART_RUNTIME_US_INI;
 
 	/* Print out: Task Initialized */
 	LOGGER_INFO(" ");
@@ -91,7 +94,11 @@ void task_receiver(void *parameters)
 		 * task_sender through an application queue. */
 		do
 		{
+			/* WCET measurement point for the UART driver interface: this
+			 * captures only read_uart(), not the periodic task delay. */
+			cycle_counter_reset();
 			status = read_uart(&huart2, task_uart_echo_dta.data, sizeof(task_uart_echo_dta.data), &rx_size);
+			g_read_uart_runtime_us = cycle_counter_get_time_us();
 			if (TASK_UART_STATUS_OK == status)
 			{
 				task_uart_echo_dta.size = rx_size;

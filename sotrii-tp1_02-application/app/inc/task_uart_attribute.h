@@ -49,6 +49,7 @@ extern "C" {
 #define TASK_UART_TX_SPOOLER_LENGTH	256
 #define TASK_UART_RX_SPOOLER_LENGTH	256
 #define TASK_UART_TX_CHUNK_LENGTH	32
+#define TASK_UART_MAX_DEVICES		2
 
 /********************** typedef **********************************************/
 typedef enum
@@ -79,6 +80,10 @@ typedef struct
 typedef struct
 {
 	UART_HandleTypeDef *	device_id;
+
+	/* Active slot in the UART driver table. Used to route HAL callbacks by
+	 * peripheral instance instead of hardcoding USARTx in app_it.c. */
+	bool					is_active;
 
 	TaskHandle_t			task_tx;
 	TaskHandle_t			task_rx;

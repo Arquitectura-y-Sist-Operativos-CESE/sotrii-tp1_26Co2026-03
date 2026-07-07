@@ -48,6 +48,7 @@
 
 /********************** macros and definitions *******************************/
 #define G_TASK_SENDER_CNT_INI	0ul
+#define G_WRITE_UART_RUNTIME_US_INI	0ul
 
 #define TASK_SENDER_DEL_ZERO	(pdMS_TO_TICKS(0ul))
 #define TASK_SENDER_DEL_MAX		(pdMS_TO_TICKS(250ul))
@@ -61,6 +62,7 @@ const char *p_task_sender_wait_250mS		= "   ==> Task SENDER - Wait:   250mS";
 
 /********************** external data declaration ****************************/
 uint32_t g_task_sender_cnt;
+volatile uint32_t g_write_uart_runtime_us;
 
 /********************** external functions definition ************************/
 /* Task thread */
@@ -73,6 +75,7 @@ void task_sender(void *parameters)
 
 	/*  Declare & Initialize Task Function variables */
 	g_task_sender_cnt = G_TASK_SENDER_CNT_INI;
+	g_write_uart_runtime_us = G_WRITE_UART_RUNTIME_US_INI;
 
 	/* Print out: Task Initialized */
 	LOGGER_INFO(" ");
@@ -88,7 +91,11 @@ void task_sender(void *parameters)
 		 * through the UART driver TX interface. */
 		xQueueReceive(h_queue_uart_echo, &task_uart_echo_dta, portMAX_DELAY);
 
+		/* WCET measurement point for the UART driver interface: this captures
+		 * only write_uart(), not the physical interrupt-driven transmission. */
+		cycle_counter_reset();
 		status = write_uart(&huart2, task_uart_echo_dta.data, task_uart_echo_dta.size);
+		g_write_uart_runtime_us = cycle_counter_get_time_us();
 		if (TASK_UART_STATUS_OK != status)
 		{
 			LOGGER_INFO("   ==> Task SENDER - UART write error status: %d", (int)status);

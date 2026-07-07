@@ -54,10 +54,13 @@
 /********************** internal data declaration ****************************/
 
 /********************** internal data declaration ****************************/
-static task_uart_dta_t task_uart_dta;
+static task_uart_dta_t g_drivers[TASK_UART_MAX_DEVICES];
 
 /********************** internal functions declaration ***********************/
 static task_uart_status_t task_uart_hal_to_status(HAL_StatusTypeDef hal_status);
+static bool task_uart_is_device_instance(task_uart_dta_t *p_task_uart_dta, UART_HandleTypeDef *h_uart_device);
+static task_uart_dta_t * task_uart_find_device(UART_HandleTypeDef *h_uart_device);
+static task_uart_dta_t * task_uart_find_free_device(void);
 static void task_uart_spooler_reset(task_uart_spooler_t *spooler);
 static uint16_t task_uart_spooler_free_space(task_uart_spooler_t *spooler);
 static task_uart_status_t task_uart_tx_spooler_write(task_uart_dta_t *p_task_uart_dta, uint8_t *data, uint16_t size);
@@ -73,9 +76,20 @@ static task_uart_status_t task_uart_rx_spooler_write_from_isr(task_uart_spooler_
 void open_uart(UART_HandleTypeDef *h_uart_device)
 {
 	BaseType_t ret;
-	task_uart_dta_t *p_task_uart_dta = &task_uart_dta;
+	task_uart_dta_t *p_task_uart_dta = task_uart_find_device(h_uart_device);
+
+	configASSERT(NULL != h_uart_device);
+
+	if (NULL != p_task_uart_dta)
+	{
+		return;
+	}
+
+	p_task_uart_dta = task_uart_find_free_device();
+	configASSERT(NULL != p_task_uart_dta);
 
 	p_task_uart_dta->device_id = h_uart_device;
+	p_task_uart_dta->is_active = true;
 	p_task_uart_dta->tx_status = TASK_UART_STATUS_OK;
 	p_task_uart_dta->rx_status = TASK_UART_STATUS_OK;
 	p_task_uart_dta->tx_spooler.buffer = (uint8_t *)pvPortMalloc(TASK_UART_TX_SPOOLER_LENGTH);
@@ -131,10 +145,10 @@ void open_uart(UART_HandleTypeDef *h_uart_device)
 
 void release_uart(UART_HandleTypeDef *h_uart_device)
 {
-	task_uart_dta_t *p_task_uart_dta = &task_uart_dta;
+	task_uart_dta_t *p_task_uart_dta = task_uart_find_device(h_uart_device);
 
-	// Check which version of the uart triggered this function
-	if (p_task_uart_dta->device_id == h_uart_device)
+	// Check which UART instance triggered this function
+	if (NULL != p_task_uart_dta)
 	{
 		HAL_UART_Abort_IT(p_task_uart_dta->device_id);
 
@@ -154,17 +168,20 @@ void release_uart(UART_HandleTypeDef *h_uart_device)
 
 		vTaskDelete(p_task_uart_dta->task_tx);
 		vTaskDelete(p_task_uart_dta->task_rx);
+
+		p_task_uart_dta->is_active = false;
+		p_task_uart_dta->device_id = NULL;
 	}
 }
 
 task_uart_status_t write_uart(UART_HandleTypeDef *h_uart_device, uint8_t *data, uint16_t size)
 {
-	task_uart_dta_t *p_task_uart_dta = &task_uart_dta;
+	task_uart_dta_t *p_task_uart_dta = task_uart_find_device(h_uart_device);
 	task_uart_tx_dta_t task_uart_tx_dta = { TASK_UART_EVENT_DATA_READY };
 	task_uart_status_t status = TASK_UART_STATUS_ERROR;
 
-	// Check which version of the uart triggered this function
-	if ((p_task_uart_dta->device_id == h_uart_device) && (NULL != data) && (0u != size))
+	// Check which UART instance triggered this function
+	if ((NULL != p_task_uart_dta) && (NULL != data) && (0u != size))
 	{
 		/* Output Data Spooler: write_uart() stores the bytes in the driver
 		 * circular buffer and only uses queue_tx to wake the TX gatekeeper. */
@@ -187,12 +204,12 @@ task_uart_status_t write_uart(UART_HandleTypeDef *h_uart_device, uint8_t *data, 
 
 task_uart_status_t read_uart(UART_HandleTypeDef *h_uart_device, uint8_t *data, uint16_t size, uint16_t *read_size)
 {
-	task_uart_dta_t *p_task_uart_dta = &task_uart_dta;
+	task_uart_dta_t *p_task_uart_dta = task_uart_find_device(h_uart_device);
 	uint16_t i = 0u;
 	task_uart_status_t status = TASK_UART_STATUS_ERROR;
 
-	// Check which version of the uart triggered this function
-	if ((p_task_uart_dta->device_id == h_uart_device) && (NULL != data) && (NULL != read_size) && (0u != size))
+	// Check which UART instance triggered this function
+	if ((NULL != p_task_uart_dta) && (NULL != data) && (NULL != read_size) && (0u != size))
 	{
 		/* Input Data Spooler: read_uart() drains the circular RX buffer and
 		 * returns immediately if no received bytes are pending. */
@@ -210,13 +227,18 @@ void ioctl_uart(UART_HandleTypeDef *h_uart_device)
 	UNUSED(h_uart_device);
 }
 
+bool uart_is_active_instance(UART_HandleTypeDef *h_uart_device)
+{
+	return (NULL != task_uart_find_device(h_uart_device));
+}
+
 void uart_tx_cplt_callback(UART_HandleTypeDef *h_uart_device)
 {
-	task_uart_dta_t *p_task_uart_dta = &task_uart_dta;
+	task_uart_dta_t *p_task_uart_dta = task_uart_find_device(h_uart_device);
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-	// Check which version of the uart triggered this callback
-	if (p_task_uart_dta->device_id == h_uart_device)
+	// Check which UART instance triggered this callback
+	if (NULL != p_task_uart_dta)
 	{
 		p_task_uart_dta->tx_status = TASK_UART_STATUS_OK;
 		xSemaphoreGiveFromISR(p_task_uart_dta->sem_tx_done, &xHigherPriorityTaskWoken);
@@ -226,12 +248,12 @@ void uart_tx_cplt_callback(UART_HandleTypeDef *h_uart_device)
 
 void uart_rx_cplt_callback(UART_HandleTypeDef *h_uart_device)
 {
-	task_uart_dta_t *p_task_uart_dta = &task_uart_dta;
+	task_uart_dta_t *p_task_uart_dta = task_uart_find_device(h_uart_device);
 	task_uart_rx_dta_t task_uart_rx_dta = { TASK_UART_EVENT_DATA_READY };
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-	// Check which version of the uart triggered this callback
-	if (p_task_uart_dta->device_id == h_uart_device)
+	// Check which UART instance triggered this callback
+	if (NULL != p_task_uart_dta)
 	{
 		if (TASK_UART_STATUS_OK != task_uart_rx_spooler_write_from_isr(&p_task_uart_dta->rx_spooler,
 																	   p_task_uart_dta->rx_byte))
@@ -258,6 +280,45 @@ void uart_rx_cplt_callback(UART_HandleTypeDef *h_uart_device)
 }
 
 /********************** internal functions definition ************************/
+static bool task_uart_is_device_instance(task_uart_dta_t *p_task_uart_dta, UART_HandleTypeDef *h_uart_device)
+{
+	return ((NULL != p_task_uart_dta) &&
+			(NULL != p_task_uart_dta->device_id) &&
+			(NULL != h_uart_device) &&
+			(true == p_task_uart_dta->is_active) &&
+			(p_task_uart_dta->device_id->Instance == h_uart_device->Instance));
+}
+
+static task_uart_dta_t * task_uart_find_device(UART_HandleTypeDef *h_uart_device)
+{
+	uint8_t i;
+
+	for (i = 0u; i < TASK_UART_MAX_DEVICES; i++)
+	{
+		if (task_uart_is_device_instance(&g_drivers[i], h_uart_device))
+		{
+			return &g_drivers[i];
+		}
+	}
+
+	return NULL;
+}
+
+static task_uart_dta_t * task_uart_find_free_device(void)
+{
+	uint8_t i;
+
+	for (i = 0u; i < TASK_UART_MAX_DEVICES; i++)
+	{
+		if (false == g_drivers[i].is_active)
+		{
+			return &g_drivers[i];
+		}
+	}
+
+	return NULL;
+}
+
 static void task_uart_spooler_reset(task_uart_spooler_t *spooler)
 {
 	spooler->head = 0u;
