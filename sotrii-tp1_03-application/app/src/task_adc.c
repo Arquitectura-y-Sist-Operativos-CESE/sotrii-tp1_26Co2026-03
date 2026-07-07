@@ -70,38 +70,57 @@ uint32_t g_task_xxxx_tx_runtime_us;
 
 uint32_t g_task_xxxx_rx_cnt;
 uint32_t g_task_xxxx_rx_runtime_us;
+extern adc_device_t g_adc_device_1;
 
 /********************** external functions definition ************************/
 /* Task ADC RX thread */
 void task_adc_rx(void *parameters)
 {
-	/* Prevent unused argument(s) compilation warning */
-	UNUSED(parameters);
 
 	/*  Declare & Initialize Task Function variables */
 	g_task_xxxx_rx_cnt = G_TASK_XXXX_CNT_INI;
 	g_task_xxxx_rx_runtime_us = G_TASK_XXXX_RUNTIME_US_INI;
 
-	/* Print out: Task Initialized */
-	LOGGER_INFO(" ");
-	LOGGER_INFO("%s is running - Tick [mS] = %3d", pcTaskGetName(NULL), (int)xTaskGetTickCount());
+	/* 1. Control de parámetros */
+	    configASSERT(parameters != NULL);
+	    if (parameters == NULL) {
+	        vTaskDelete(NULL);
+	    }
+
+	    adc_device_t *adc_dev = (adc_device_t *)parameters;
+	    uint32_t latest_adc_value = 0;
+
+	    LOGGER_INFO(" ");
+	    LOGGER_INFO("%s is running - Gatekeeper Init", pcTaskGetName(NULL));
+	    LOGGER_INFO("%s is running - Tick [mS] = %3d", pcTaskGetName(NULL), (int)xTaskGetTickCount());
 
 	/* As per most tasks, this task is implemented in an infinite loop. */
-	for (;;)
-	{
+	for (;;) {
 		/* Update Task Counter */
 		g_task_xxxx_rx_cnt++;
 
 		cycle_counter_reset();
 
 		HAL_GPIO_TogglePin(LED_A_PORT, LED_A_PIN);
+		/* Espera la notificación desde la interrupción del DMA (Bloqueante) */
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		/* Si el driver está operativo, extraemos del DMA y enviamos a la cola */
+		if (adc_dev->is_initialized && (adc_dev->device_queue != NULL)) {
 
-		g_task_xxxx_rx_runtime_us = cycle_counter_get_time_us();
+			/* Spooler: Tomamos el último valor convertido (o se puede promediar el buffer) */
+			latest_adc_value = adc_dev->dma_buffer[ADC_DMA_BUFFER_SIZE - 1];
 
-    	/* Print out: Wait 250mS */
-		LOGGER_INFO(p_task_adc_rx_wait_250mS);
-		vTaskDelay(TASK_XXXX_DEL_MAX);
+			/* Latest Input Only: Sobrescribe el slot único de la cola */
+			xQueueOverwrite(adc_dev->device_queue, &latest_adc_value);
+
+			g_task_xxxx_rx_runtime_us = cycle_counter_get_time_us();
+
+			(void)HAL_ADC_Start_DMA(adc_dev->h_adc,
+									(uint32_t *)adc_dev->dma_buffer,
+									ADC_DMA_BUFFER_SIZE);
+
+		}
 	}
-}
+	}
 
 /********************** end of file ******************************************/

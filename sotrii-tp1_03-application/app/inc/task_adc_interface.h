@@ -53,7 +53,7 @@ extern void open_adc(ADC_HandleTypeDef *h_adc_device);
 extern void release_adc(ADC_HandleTypeDef *h_adc_device);
 
 extern void write_adc(ADC_HandleTypeDef *h_adc_device);
-extern void read_adc(ADC_HandleTypeDef *h_adc_device);
+extern BaseType_t read_adc(ADC_HandleTypeDef *h_adc_device, uint32_t *out_value);
 
 extern void ioctl_adc(ADC_HandleTypeDef *h_adc_device);
 

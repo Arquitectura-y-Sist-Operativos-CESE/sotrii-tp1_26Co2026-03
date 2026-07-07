@@ -43,26 +43,58 @@ extern "C" {
 /********************** inclusions *******************************************/
 
 /********************** macros ***********************************************/
+#define TASK_I2C_HAL_TIMEOUT_MS		10u
 
 /********************** typedef **********************************************/
+typedef enum
+{
+	TASK_I2C_STATUS_OK = 0,
+	TASK_I2C_STATUS_ERROR,
+	TASK_I2C_STATUS_BUSY,
+	TASK_I2C_STATUS_TIMEOUT
+} task_i2c_status_t;
+
 /* Structure of Task */
 typedef struct
 {
 	I2C_HandleTypeDef * device_id;
+	SemaphoreHandle_t	mutex_bus;
 
 	TaskHandle_t		task_tx;
 	QueueHandle_t		queue_tx;
 
+	/* TX synchronization resources: write_i2c() blocks until task_i2c_tx()
+	 * completes the HAL polling transfer and gives sem_tx_done. */
+	SemaphoreHandle_t	sem_tx_done;
+	SemaphoreHandle_t	mutex_tx;
+	task_i2c_status_t	tx_status;
+
 	TaskHandle_t		task_rx;
 	QueueHandle_t		queue_rx;
+
+	/* RX synchronization resources: read_i2c() blocks until task_i2c_rx()
+	 * completes the HAL polling transfer and gives sem_rx_done. */
+	SemaphoreHandle_t	sem_rx_done;
+	SemaphoreHandle_t	mutex_rx;
+	task_i2c_status_t	rx_status;
 } task_i2c_dta_t;
 
 /* Structure of I2C Tx */
 typedef struct
 {
 	uint16_t	address;
-	uint8_t		data;
+	uint8_t *	data;
+	uint16_t	size;
 } task_i2c_tx_dta_t;
+
+/* Structure of I2C Rx */
+typedef struct
+{
+	uint16_t	address;
+	uint8_t		reg;
+	uint8_t *	data;
+	uint16_t	size;
+} task_i2c_rx_dta_t;
 
 /********************** external data declaration ****************************/
 

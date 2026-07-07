@@ -5,4 +5,4 @@
 ### Responsable de la entrega:
 | Padrón | Apellidos, Nombres | Fecha | Deadline |
 | :----- | :--------------------- | :------: | :-------: |
-|  |  | 14/07/2026 | Semana 04 |
+| e2603 | Espinola, Maximiliano Ariel | 14/07/2026 | Semana 04 |

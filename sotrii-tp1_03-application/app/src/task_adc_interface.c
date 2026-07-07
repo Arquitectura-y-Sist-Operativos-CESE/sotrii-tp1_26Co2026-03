@@ -50,14 +50,18 @@
 #include "task_adc_interface.h"
 
 /********************** macros and definitions *******************************/
+#define G_OPEN_ADC_RUNTIME_US_INI	0ul
+#define G_READ_ADC_RUNTIME_US_INI	0ul
 
 /********************** internal data declaration ****************************/
-
+adc_device_t g_adc_device_1 = {0};
 /********************** internal data declaration ****************************/
 
 /********************** internal functions declaration ***********************/
 
 /********************** internal data definition *****************************/
+volatile uint32_t g_open_adc_runtime_us;
+volatile uint32_t g_read_adc_runtime_us;
 
 /********************** external data declaration ****************************/
 
@@ -65,27 +69,87 @@
 /* Interface functions */
 void open_adc(ADC_HandleTypeDef *h_adc_device)
 {
-	/* Prevent unused argument(s) compilation warning */
-	UNUSED(h_adc_device);
+    cycle_counter_reset();
+    g_open_adc_runtime_us = G_OPEN_ADC_RUNTIME_US_INI;
+
+    configASSERT(h_adc_device != NULL);
+    if (h_adc_device == NULL) {
+        g_open_adc_runtime_us = cycle_counter_get_time_us();
+        return;
+    }
+
+    g_adc_device_1.device_id = 1;
+    g_adc_device_1.h_adc = h_adc_device;
+    g_adc_device_1.is_initialized = false;
+
+    /* Crear la cola estática */
+    g_adc_device_1.device_queue = xQueueCreateStatic(
+                                      ADC_QUEUE_LENGTH,
+                                      ADC_ITEM_SIZE,
+                                      g_adc_device_1.queue_storage,
+                                      &g_adc_device_1.queue_cb);
+
+    configASSERT(g_adc_device_1.device_queue != NULL);
+    if (g_adc_device_1.device_queue == NULL) {
+        g_open_adc_runtime_us = cycle_counter_get_time_us();
+        return;
+    }
+
+    /* Iniciar el hardware (DMA en modo circular llenando el Spooler) */
+    HAL_StatusTypeDef hal_status = HAL_ADC_Start_DMA(g_adc_device_1.h_adc,
+                                                    (uint32_t*)g_adc_device_1.dma_buffer,
+                                                    ADC_DMA_BUFFER_SIZE);
+
+    configASSERT(hal_status == HAL_OK);
+    if (hal_status == HAL_OK) {
+        g_adc_device_1.is_initialized = true;
+    }
+
+    g_open_adc_runtime_us = cycle_counter_get_time_us();
+}
+
+BaseType_t read_adc(ADC_HandleTypeDef *h_adc_device, uint32_t *out_value)
+{
+    BaseType_t ret = pdFAIL;
+
+    cycle_counter_reset();
+    g_read_adc_runtime_us = G_READ_ADC_RUNTIME_US_INI;
+
+    if ((h_adc_device == NULL) || (out_value == NULL)) {
+        g_read_adc_runtime_us = cycle_counter_get_time_us();
+        return ret;
+    }
+
+    if (!g_adc_device_1.is_initialized || (g_adc_device_1.h_adc != h_adc_device)) {
+        g_read_adc_runtime_us = cycle_counter_get_time_us();
+        return ret;
+    }
+
+    /* Patrón Latest Input Only: timeout cortísimo porque el dato ya debería estar */
+    if (xQueuePeek(g_adc_device_1.device_queue, out_value, pdMS_TO_TICKS(1)) == pdPASS) {
+        ret = pdPASS;
+    }
+
+    g_read_adc_runtime_us = cycle_counter_get_time_us();
+    return ret;
 }
 
 void release_adc(ADC_HandleTypeDef *h_adc_device)
 {
-	/* Prevent unused argument(s) compilation warning */
-	UNUSED(h_adc_device);
+    if ((h_adc_device != NULL) && (g_adc_device_1.h_adc == h_adc_device) && g_adc_device_1.is_initialized) {
+        HAL_StatusTypeDef hal_status = HAL_ADC_Stop_DMA(g_adc_device_1.h_adc);
+        configASSERT(hal_status == HAL_OK);
+        if (hal_status == HAL_OK) {
+            g_adc_device_1.is_initialized = false;
+        }
+    }
 }
-
 void write_adc(ADC_HandleTypeDef *h_adc_device)
 {
 	/* Prevent unused argument(s) compilation warning */
 	UNUSED(h_adc_device);
 }
 
-void read_adc(ADC_HandleTypeDef *h_adc_device)
-{
-	/* Prevent unused argument(s) compilation warning */
-	UNUSED(h_adc_device);
-}
 
 void ioctl_adc(ADC_HandleTypeDef *h_adc_device)
 {

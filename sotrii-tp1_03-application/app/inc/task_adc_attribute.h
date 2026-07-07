@@ -41,8 +41,13 @@ extern "C" {
 #endif
 
 /********************** inclusions *******************************************/
-
-/********************** macros ***********************************************/
+#include "task.h"
+#include "queue.h"
+/********************** macros and defines ***********************************************/
+/* Definiciones para el Spooler (DMA Buffer) y Colas */
+#define ADC_DMA_BUFFER_SIZE  10 // Tamaño del buffer DMA (Input Spooler)
+#define ADC_QUEUE_LENGTH     1  // Latest Input Only requiere cola de tamaño 1
+#define ADC_ITEM_SIZE        sizeof(uint32_t)
 
 /********************** typedef **********************************************/
 /* Structure of Task */
@@ -50,8 +55,23 @@ extern "C" {
 
 /* Structure of ADC Tx */
 
+/* Estructura del Dispositivo ADC */
+typedef struct {
+    uint32_t            device_id;
+    ADC_HandleTypeDef* h_adc;           // Referencia al hardware
+    QueueHandle_t       device_queue;    // Cola para el patrón Latest Input Only
+    StaticQueue_t       queue_cb;        // Control Block para asignación estática
+    uint8_t             queue_storage[ADC_QUEUE_LENGTH * ADC_ITEM_SIZE]; // Memoria estática
+
+    // Input Data Spooler (Buffer circular manejado por el DMA)
+    uint16_t            dma_buffer[ADC_DMA_BUFFER_SIZE];
+    volatile bool       is_initialized;  /* Control de errores */
+} adc_device_t;
 
 /********************** external data declaration ****************************/
+/* Declaración externa de la instancia del dispositivo */
+extern adc_device_t g_adc_device_1;
+extern TaskHandle_t h_task_adc; /* Handle de la tarea Gatekeeper */
 
 /********************** external functions declaration ***********************/
 
