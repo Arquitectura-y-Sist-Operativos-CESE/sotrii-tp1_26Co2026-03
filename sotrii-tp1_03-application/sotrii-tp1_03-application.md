@@ -59,12 +59,38 @@ En esta sección se detallan las decisiones de diseño y las métricas obtenidas
 * **Asignación Estática (Static Allocation):** Las colas fueron creadas mediante `xQueueCreateStatic()`. Esto garantiza que la memoria se reserve en tiempo de compilación (BSS/Data), evitando problemas de fragmentación de memoria dinámica (Heap) típicos en sistemas embebidos de alta criticidad.
 * **Patrón de Diseño "Latest Input Only":** Se implementó configurando la longitud de la cola (`ADC_QUEUE_LENGTH`) en 1 y utilizando la API `xQueueOverwrite()`. Esto garantiza que la tarea receptora (`task_receiver`) siempre obtenga la lectura más fresca y reciente del ADC, descartando valores viejos (comportamiento ideal para sensores de monitoreo continuo).
 
-## Observaciones y Medición de WCET (Worst-Case Execution Time)
+## Evidencia del Setup Utilizado
 
-Se utilizó el DWT (Data Watchpoint and Trace) del núcleo ARM Cortex-M4 (mediante `cycle_counter_get_time_us()`) para medir el tiempo de ejecución en el peor de los casos de las funciones de interfaz:
+Reemplazar el siguiente placeholder por una captura/foto del setup real utilizado para la prueba del ADC. La evidencia esperada es la conexion entre la placa STM32 Nucleo y la fuente/potenciometro usado para inyectar la tension analogica al canal ADC configurado.
 
-* **`open_adc()` WCET:** `[COMPLETAR_CON_TU_MEDICION] µs`
-    * *Observación:* Es la función que más tarda ya que configura las estructuras estáticas del RTOS e inicializa el hardware del DMA y el ADC. Al ejecutarse una sola vez en el startup, su peso no afecta el tiempo real.
-* **`read_adc()` WCET:** `[COMPLETAR_CON_TU_MEDICION] µs`
-    * *Observación:* Es extremadamente rápida porque simplemente extrae un dato de la cola mediante `xQueueReceive`. Al no bloquearse esperando al hardware (porque de eso se encarga el DMA y el Gatekeeper), su WCET es bajo y determinístico, cumpliendo con los requisitos de RTOS.
-* **Comportamiento de la Tarea Gatekeeper:** Al observar la ejecución mediante el depurador, se constata que la tarea permanece en estado *Blocked* (consumiendo 0% de CPU) hasta que el DMA dispara la interrupción de completado.
+![Placeholder setup ADC](doc/img/setup_adc_placeholder.png)
+
+## Observaciones y Medicion de WCET (Worst-Case Execution Time)
+
+Se utilizo el DWT (Data Watchpoint and Trace) del nucleo ARM Cortex-M4 (mediante `cycle_counter_get_time_us()`) para medir el tiempo de ejecucion de las funciones de interfaz del driver.
+
+Para visualizar las mediciones en STM32CubeIDE se agregan las siguientes variables en la ventana **Expressions / Watch**:
+
+| Variable | Que mide | Valor medido |
+| --- | --- | --- |
+| `g_open_adc_runtime_us` | Tiempo de ejecucion de `open_adc()`, incluyendo creacion de cola estatica e inicio de ADC por DMA. | `50 us` |
+| `g_read_adc_runtime_us` | Tiempo de ejecucion de `read_adc()`, incluyendo la consulta a la cola Latest Input Only. | `4 us` |
+
+Evidencia de la medicion tomada con STM32CubeIDE, observando `g_open_adc_runtime_us` y `g_read_adc_runtime_us` en la ventana Expressions / Watch:
+
+![Medicion WCET ADC](doc/img/adc_wcet_measurement.png)
+
+Variables auxiliares utiles para observar el comportamiento del driver:
+
+| Variable | Uso |
+| --- | --- |
+| `g_task_xxxx_rx_runtime_us` | Tiempo de ejecucion de la tarea Gatekeeper ADC al procesar una notificacion del DMA. |
+| `hal_xxxx_callback_runtime_us` | Tiempo registrado dentro del callback HAL de conversion completa. |
+| `hal_xxxx_callback_cnt` | Cantidad de callbacks de conversion ADC recibidos. |
+| `g_adc_device_1.is_initialized` | Estado de inicializacion del dispositivo ADC. |
+
+* **`open_adc()` WCET:** `50 us`
+    * *Observacion:* Es la funcion que mas tarda ya que configura las estructuras estaticas del RTOS e inicializa el hardware del DMA y el ADC. Al ejecutarse una sola vez en el startup, su peso no afecta el tiempo real.
+* **`read_adc()` WCET:** `4 us`
+    * *Observacion:* Es rapida porque consulta el ultimo dato disponible mediante `xQueuePeek`. Al no consumir el dato de la cola, se mantiene el patron Latest Input Only: si la aplicacion lee mas lento que el ADC, siempre observa la muestra mas reciente publicada por el Gatekeeper.
+* **Comportamiento de la Tarea Gatekeeper:** Al observar la ejecucion mediante el depurador, se constata que la tarea permanece en estado *Blocked* hasta que el DMA dispara la interrupcion de completado.

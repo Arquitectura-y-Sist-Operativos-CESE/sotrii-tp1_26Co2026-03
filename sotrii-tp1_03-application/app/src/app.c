@@ -127,7 +127,7 @@ void app_init(void)
 	/* Le pasamos (void *)&g_adc_device_1 como parámetro */
 	ret = xTaskCreate(task_adc_rx, "Task ADC Gatekeeper",
 			(2 * configMINIMAL_STACK_SIZE), (void*) &g_adc_device_1,
-			(tskIDLE_PRIORITY + 2ul), &h_task_adc);
+			(tskIDLE_PRIORITY + 1ul), &h_task_adc);
 	configASSERT(pdPASS == ret);
 
 	/* Total amount of heap space that remains unallocated. Is also available
@@ -140,14 +140,14 @@ void app_init(void)
      * one task in this state at the moment), but the currently run task ID
      * is stored in variable pxCurrentTCB */
 
+	/* Init Cycle Counter */
+	cycle_counter_init();
+
     /* ADC Device Diver Init */
     open_adc(&hadc1);
 
     /* Application Interrupts Init */
 	app_it_init();
-
-	/* Init Cycle Counter */
-	cycle_counter_init();
 }
 
 /********************** end of file ******************************************/

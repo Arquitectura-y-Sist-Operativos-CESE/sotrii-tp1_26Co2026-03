@@ -45,7 +45,7 @@ extern "C" {
 #include "queue.h"
 /********************** macros and defines ***********************************************/
 /* Definiciones para el Spooler (DMA Buffer) y Colas */
-#define ADC_DMA_BUFFER_SIZE  16 // Tamaño del buffer DMA (Input Spooler)
+#define ADC_DMA_BUFFER_SIZE  10 // Tamaño del buffer DMA (Input Spooler)
 #define ADC_QUEUE_LENGTH     1  // Latest Input Only requiere cola de tamaño 1
 #define ADC_ITEM_SIZE        sizeof(uint32_t)
 
@@ -64,7 +64,7 @@ typedef struct {
     uint8_t             queue_storage[ADC_QUEUE_LENGTH * ADC_ITEM_SIZE]; // Memoria estática
 
     // Input Data Spooler (Buffer circular manejado por el DMA)
-    uint32_t            dma_buffer[ADC_DMA_BUFFER_SIZE];
+    uint16_t            dma_buffer[ADC_DMA_BUFFER_SIZE];
     volatile bool       is_initialized;  /* Control de errores */
 } adc_device_t;
 

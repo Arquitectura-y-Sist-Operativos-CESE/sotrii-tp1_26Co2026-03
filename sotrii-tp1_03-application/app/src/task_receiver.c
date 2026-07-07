@@ -51,6 +51,8 @@
 
 #define TASK_RECEIVER_DEL_ZERO		(pdMS_TO_TICKS(0ul))
 #define TASK_RECEIVER_DEL_MAX		(pdMS_TO_TICKS(250ul))
+#define TASK_RECEIVER_ADC_VREF_MV	3300ul
+#define TASK_RECEIVER_ADC_MAX_COUNT	4095ul
 
 /********************** internal data declaration ****************************/
 
@@ -70,6 +72,7 @@ void task_receiver(void *parameters)
 	/*  Declare & Initialize Task Function variables */
 	g_task_receiver_cnt = G_TASK_RECEIVER_CNT_INI;
 	uint32_t current_adc_value = 0;
+	uint32_t adc_mv = 0;
 
 	/* Print out: Task Initialized */
 	LOGGER_INFO(" ");
@@ -86,7 +89,11 @@ void task_receiver(void *parameters)
 				if (read_adc(&hadc1, &current_adc_value) == pdPASS) {
 
 					/* Lectura exitosa: mostramos el valor por consola */
-					LOGGER_INFO("Task RECEIVER - ADC Value: %lu", current_adc_value);
+					adc_mv = (current_adc_value * TASK_RECEIVER_ADC_VREF_MV) / TASK_RECEIVER_ADC_MAX_COUNT;
+					LOGGER_INFO("Task RECEIVER - ADC Value: %lu counts - %lu.%03lu V",
+								current_adc_value,
+								(adc_mv / 1000ul),
+								(adc_mv % 1000ul));
 
 				} else {
 

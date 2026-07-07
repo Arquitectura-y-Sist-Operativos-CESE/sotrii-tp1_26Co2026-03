@@ -115,6 +115,10 @@ void task_adc_rx(void *parameters)
 
 			g_task_xxxx_rx_runtime_us = cycle_counter_get_time_us();
 
+			(void)HAL_ADC_Start_DMA(adc_dev->h_adc,
+									(uint32_t *)adc_dev->dma_buffer,
+									ADC_DMA_BUFFER_SIZE);
+
 		}
 	}
 	}
