@@ -41,60 +41,37 @@ extern "C" {
 #endif
 
 /********************** inclusions *******************************************/
-#include "cmsis_os.h"
-
-/********************** macros ***********************************************/
-#define TASK_ADC_CHANNEL_QTY			10u
-#define TASK_ADC_RX_QUEUE_LENGTH		1u
-#define TASK_ADC_RX_STACK_WORDS			(2u * configMINIMAL_STACK_SIZE)
+#include "task.h"
+#include "queue.h"
+/********************** macros and defines ***********************************************/
+/* Definiciones para el Spooler (DMA Buffer) y Colas */
+#define ADC_DMA_BUFFER_SIZE  10 // Tamaño del buffer DMA (Input Spooler)
+#define ADC_QUEUE_LENGTH     1  // Latest Input Only requiere cola de tamaño 1
+#define ADC_ITEM_SIZE        sizeof(uint32_t)
 
 /********************** typedef **********************************************/
-typedef enum
-{
-	TASK_ADC_STATUS_OK = 0,
-	TASK_ADC_STATUS_ERROR,
-	TASK_ADC_STATUS_BUSY,
-	TASK_ADC_STATUS_TIMEOUT,
-	TASK_ADC_STATUS_EMPTY,
-	TASK_ADC_STATUS_FULL
-} task_adc_status_t;
-
-typedef enum
-{
-	TASK_ADC_EVENT_CONVERSION_READY = 0
-} task_adc_event_t;
-
-typedef struct
-{
-	task_adc_event_t	event;
-} task_adc_rx_dta_t;
-
 /* Structure of Task */
-typedef struct
-{
-	ADC_HandleTypeDef *	device_id;
-
-	TaskHandle_t		task_rx;
-	StaticTask_t		task_rx_tcb;
-	StackType_t			task_rx_stack[TASK_ADC_RX_STACK_WORDS];
-
-	QueueHandle_t		queue_rx;
-	StaticQueue_t		queue_rx_cb;
-	uint8_t				queue_rx_storage[TASK_ADC_RX_QUEUE_LENGTH * sizeof(task_adc_rx_dta_t)];
-
-	uint16_t			dma_buffer[TASK_ADC_CHANNEL_QTY];
-	uint16_t			latest_buffer[TASK_ADC_CHANNEL_QTY];
-	uint16_t			latest_size;
-	bool				latest_available;
-
-	task_adc_status_t	rx_status;
-} task_adc_dta_t;
 
 
 /* Structure of ADC Tx */
 
+/* Estructura del Dispositivo ADC */
+typedef struct {
+    uint32_t            device_id;
+    ADC_HandleTypeDef* h_adc;           // Referencia al hardware
+    QueueHandle_t       device_queue;    // Cola para el patrón Latest Input Only
+    StaticQueue_t       queue_cb;        // Control Block para asignación estática
+    uint8_t             queue_storage[ADC_QUEUE_LENGTH * ADC_ITEM_SIZE]; // Memoria estática
+
+    // Input Data Spooler (Buffer circular manejado por el DMA)
+    uint16_t            dma_buffer[ADC_DMA_BUFFER_SIZE];
+    volatile bool       is_initialized;  /* Control de errores */
+} adc_device_t;
 
 /********************** external data declaration ****************************/
+/* Declaración externa de la instancia del dispositivo */
+extern adc_device_t g_adc_device_1;
+extern TaskHandle_t h_task_adc; /* Handle de la tarea Gatekeeper */
 
 /********************** external functions declaration ***********************/
 

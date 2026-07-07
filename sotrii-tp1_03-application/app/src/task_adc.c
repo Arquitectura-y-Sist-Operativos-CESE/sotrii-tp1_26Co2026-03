@@ -60,7 +60,6 @@
 
 /********************** internal functions declaration ***********************/
 void task_adc_rx(void *parameters);
-static task_adc_status_t task_adc_hal_to_status(HAL_StatusTypeDef hal_status);
 
 /********************** internal data definition *****************************/
 const char *p_task_adc_rx_wait_250mS	= "   ==> Task ADC RX - Wait:   250mS";
@@ -71,78 +70,57 @@ uint32_t g_task_xxxx_tx_runtime_us;
 
 uint32_t g_task_xxxx_rx_cnt;
 uint32_t g_task_xxxx_rx_runtime_us;
+extern adc_device_t g_adc_device_1;
 
 /********************** external functions definition ************************/
 /* Task ADC RX thread */
 void task_adc_rx(void *parameters)
 {
-	task_adc_dta_t *p_task_adc_rx_dta = (task_adc_dta_t *)parameters;
-	task_adc_rx_dta_t task_adc_rx_dta;
 
 	/*  Declare & Initialize Task Function variables */
 	g_task_xxxx_rx_cnt = G_TASK_XXXX_CNT_INI;
 	g_task_xxxx_rx_runtime_us = G_TASK_XXXX_RUNTIME_US_INI;
 
-	/* Print out: Task Initialized */
-	LOGGER_INFO(" ");
-	LOGGER_INFO("%s is running - Tick [mS] = %3d", pcTaskGetName(NULL), (int)xTaskGetTickCount());
+	/* 1. Control de parámetros */
+	    configASSERT(parameters != NULL);
+	    if (parameters == NULL) {
+	        vTaskDelete(NULL);
+	    }
 
-	/* ADC RX gatekeeper owns DMA starts. The DMA completion callback only
-	 * sends an event to queue_rx. */
-	p_task_adc_rx_dta->rx_status = task_adc_hal_to_status(HAL_ADC_Start_DMA(p_task_adc_rx_dta->device_id,
-																			(uint32_t *)p_task_adc_rx_dta->dma_buffer,
-																			TASK_ADC_CHANNEL_QTY));
-	if (TASK_ADC_STATUS_OK != p_task_adc_rx_dta->rx_status)
-	{
-		LOGGER_INFO("   ==> Task ADC RX - DMA start error status: %d", (int)p_task_adc_rx_dta->rx_status);
-	}
+	    adc_device_t *adc_dev = (adc_device_t *)parameters;
+	    uint32_t latest_adc_value = 0;
+
+	    LOGGER_INFO(" ");
+	    LOGGER_INFO("%s is running - Gatekeeper Init", pcTaskGetName(NULL));
+	    LOGGER_INFO("%s is running - Tick [mS] = %3d", pcTaskGetName(NULL), (int)xTaskGetTickCount());
 
 	/* As per most tasks, this task is implemented in an infinite loop. */
-	for (;;)
-	{
+	for (;;) {
 		/* Update Task Counter */
 		g_task_xxxx_rx_cnt++;
 
 		cycle_counter_reset();
 
-		xQueueReceive(p_task_adc_rx_dta->queue_rx, &task_adc_rx_dta, portMAX_DELAY);
-		if (TASK_ADC_EVENT_CONVERSION_READY == task_adc_rx_dta.event)
-		{
-			/* The ISR already updated latest_buffer. The gatekeeper only
-			 * restarts the DMA acquisition cycle for the ADC peripheral. */
-			p_task_adc_rx_dta->rx_status = task_adc_hal_to_status(HAL_ADC_Start_DMA(p_task_adc_rx_dta->device_id,
-																					(uint32_t *)p_task_adc_rx_dta->dma_buffer,
-																					TASK_ADC_CHANNEL_QTY));
-			if (TASK_ADC_STATUS_OK != p_task_adc_rx_dta->rx_status)
-			{
-				LOGGER_INFO("   ==> Task ADC RX - DMA restart error status: %d", (int)p_task_adc_rx_dta->rx_status);
-			}
+		HAL_GPIO_TogglePin(LED_A_PORT, LED_A_PIN);
+		/* Espera la notificación desde la interrupción del DMA (Bloqueante) */
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		/* Si el driver está operativo, extraemos del DMA y enviamos a la cola */
+		if (adc_dev->is_initialized && (adc_dev->device_queue != NULL)) {
+
+			/* Spooler: Tomamos el último valor convertido (o se puede promediar el buffer) */
+			latest_adc_value = adc_dev->dma_buffer[ADC_DMA_BUFFER_SIZE - 1];
+
+			/* Latest Input Only: Sobrescribe el slot único de la cola */
+			xQueueOverwrite(adc_dev->device_queue, &latest_adc_value);
+
+			g_task_xxxx_rx_runtime_us = cycle_counter_get_time_us();
+
+			(void)HAL_ADC_Start_DMA(adc_dev->h_adc,
+									(uint32_t *)adc_dev->dma_buffer,
+									ADC_DMA_BUFFER_SIZE);
+
 		}
-
-		g_task_xxxx_rx_runtime_us = cycle_counter_get_time_us();
-
-    	/* Print out: Wait 250mS */
-		// LOGGER_INFO(p_task_adc_rx_wait_250mS);
 	}
-}
-
-static task_adc_status_t task_adc_hal_to_status(HAL_StatusTypeDef hal_status)
-{
-	switch (hal_status)
-	{
-		case HAL_OK:
-			return TASK_ADC_STATUS_OK;
-
-		case HAL_BUSY:
-			return TASK_ADC_STATUS_BUSY;
-
-		case HAL_TIMEOUT:
-			return TASK_ADC_STATUS_TIMEOUT;
-
-		case HAL_ERROR:
-		default:
-			return TASK_ADC_STATUS_ERROR;
 	}
-}
 
 /********************** end of file ******************************************/

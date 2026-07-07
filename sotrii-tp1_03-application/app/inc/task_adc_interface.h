@@ -41,7 +41,6 @@ extern "C" {
 #endif
 
 /********************** inclusions *******************************************/
-#include "task_adc_attribute.h"
 
 /********************** macros ***********************************************/
 
@@ -53,11 +52,10 @@ extern "C" {
 extern void open_adc(ADC_HandleTypeDef *h_adc_device);
 extern void release_adc(ADC_HandleTypeDef *h_adc_device);
 
-extern task_adc_status_t write_adc(ADC_HandleTypeDef *h_adc_device);
-extern task_adc_status_t read_adc(ADC_HandleTypeDef *h_adc_device, uint16_t *data, uint16_t size, uint16_t *read_size);
+extern void write_adc(ADC_HandleTypeDef *h_adc_device);
+extern BaseType_t read_adc(ADC_HandleTypeDef *h_adc_device, uint32_t *out_value);
 
 extern void ioctl_adc(ADC_HandleTypeDef *h_adc_device);
-extern void adc_cplt_callback(ADC_HandleTypeDef *h_adc_device);
 
 /********************** End of CPP guard *************************************/
 #ifdef __cplusplus

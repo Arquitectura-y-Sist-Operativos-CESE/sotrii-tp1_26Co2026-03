@@ -51,7 +51,6 @@
 
 #define TASK_RECEIVER_DEL_ZERO		(pdMS_TO_TICKS(0ul))
 #define TASK_RECEIVER_DEL_MAX		(pdMS_TO_TICKS(250ul))
-
 #define TASK_RECEIVER_ADC_VREF_MV	3300ul
 #define TASK_RECEIVER_ADC_MAX_COUNT	4095ul
 
@@ -64,23 +63,16 @@ const char *p_task_receiver_wait_250mS		= "   ==> Task RECEIVER - Wait:   250mS"
 
 /********************** external data declaration ****************************/
 uint32_t g_task_receiver_cnt;
+extern ADC_HandleTypeDef hadc1;
 
 /********************** external functions definition ************************/
 /* Task thread */
 void task_receiver(void *parameters)
 {
-	uint16_t adc_data[TASK_ADC_CHANNEL_QTY];
-	uint32_t adc_acc;
-	uint32_t adc_avg;
-	uint32_t adc_mv;
-	uint16_t adc_size;
-	uint16_t i;
-	task_adc_status_t status;
-
-	UNUSED(parameters);
-
 	/*  Declare & Initialize Task Function variables */
 	g_task_receiver_cnt = G_TASK_RECEIVER_CNT_INI;
+	uint32_t current_adc_value = 0;
+	uint32_t adc_mv = 0;
 
 	/* Print out: Task Initialized */
 	LOGGER_INFO(" ");
@@ -90,33 +82,28 @@ void task_receiver(void *parameters)
 	for (;;)
     {
 		/* Update Task Counter */
-		g_task_receiver_cnt++;
+				g_task_receiver_cnt++;
 
-		status = read_adc(&hadc1, adc_data, TASK_ADC_CHANNEL_QTY, &adc_size);
-		if (TASK_ADC_STATUS_OK == status)
-		{
-			adc_acc = 0ul;
-			for (i = 0u; i < adc_size; i++)
-			{
-				adc_acc += adc_data[i];
-			}
+				/* --- Consumir datos del Driver --- */
+				/* Intentamos leer el último valor del ADC usando nuestra API segura */
+				if (read_adc(&hadc1, &current_adc_value) == pdPASS) {
 
-			adc_avg = adc_acc / adc_size;
-			adc_mv = (adc_avg * TASK_RECEIVER_ADC_VREF_MV) / TASK_RECEIVER_ADC_MAX_COUNT;
+					/* Lectura exitosa: mostramos el valor por consola */
+					adc_mv = (current_adc_value * TASK_RECEIVER_ADC_VREF_MV) / TASK_RECEIVER_ADC_MAX_COUNT;
+					LOGGER_INFO("Task RECEIVER - ADC Value: %lu counts - %lu.%03lu V",
+								current_adc_value,
+								(adc_mv / 1000ul),
+								(adc_mv % 1000ul));
 
-			LOGGER_INFO("   ==> Task RECEIVER - ADC avg: %lu counts - %lu.%03lu V",
-						adc_avg,
-						(adc_mv / 1000ul),
-						(adc_mv % 1000ul));
-		}
-		else if (TASK_ADC_STATUS_EMPTY != status)
-		{
-			LOGGER_INFO("   ==> Task RECEIVER - ADC read error status: %d", (int)status);
-		}
+				} else {
 
-    	/* Print out: Wait 250mS */
-		// LOGGER_INFO(p_task_receiver_wait_250mS);
-		vTaskDelay(TASK_RECEIVER_DEL_MAX);
+					/* Fallo al leer (Driver no inicializado, punteros nulos, o cola vacía) */
+					LOGGER_INFO("Task RECEIVER - ADC Read Failed or No Data");
+
+				}
+
+				/* Send the task to the blocked state for 250 mS */
+				vTaskDelay(TASK_RECEIVER_DEL_MAX);
 	}
 }
 

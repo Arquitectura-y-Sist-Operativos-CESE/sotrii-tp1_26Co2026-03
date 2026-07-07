@@ -49,7 +49,7 @@ extern "C" {
 /********************** external data declaration ****************************/
 
 /********************** external functions declaration ***********************/
-extern void task_adc_rx(void *parameters);
+extern void task_adc(void *parameters);
 
 /********************** End of CPP guard *************************************/
 #ifdef __cplusplus
